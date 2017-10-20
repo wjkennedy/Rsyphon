@@ -1,11 +1,6 @@
 #
 # "Rsyphon"
 #
-#  Copyright (C) 2002 Hewlett-Packard Company <dannf@fc.hp.com>
-#  Copyright (C) 2002 Bald Guy Software <brian.finley@baldguysoftware.com>
-#
-#    $Id$
-#
 
 
 DESTDIR = 
@@ -16,37 +11,36 @@ SYSTEMIMAGER_VERSION = $(shell cat ../../VERSION)
 
 MANPAGES = $(SERVER_MAN) $(SERVER_POD_MAN) $(CLIENT_MAN) $(COMMON_MAN)
 
-SERVER_MAN = rsaddclients.8 				\
-			rsgetimage.8					\
-			rsmkautoinstallcd.8			\
-			rsmkautoinstallscript.8		\
-			rsmkdhcpserver.8				\
-			rsmkdhcpstatic.8				\
-			rscpimage.8					\
-			rsmvimage.8					\
-			rsrmimage.8					\
-			rsmkbootserver.8				\
-			rsyphon.conf.5			\
-			rsyphon-rsyncd.conf.5	\
-			rsmkrsyncd_conf.8				\
-			rsmkclientnetboot.8				\
-			rsmkbootpackage.8		\
-			\
-			rsinstallbtimage.8		\
-			rsmonitor.8			\
-			rsmonitortk.8			\
-			rspcp.8			\
-			rspsh.8			\
-			rspushinstall.8		\
-			rspushoverrides.8		\
-			rsmkautoinstalldisk.8		\
-			rsnetbootmond.8		\
-			rsclusterconfig.8		\
-			rspushupdate.8
+SERVER_MAN = rs_addclients.8 				\
+			rs_getimage.8					\
+			rs_mkautoinstallcd.8			\
+			rs_mkautoinstallscript.8		\
+			rs_mkdhcpserver.8				\
+			rs_mkdhcpstatic.8				\
+			rs_cpimage.8					\
+			rs_mvimage.8					\
+			rs_rmimage.8					\
+			rs_mkbootserver.8				\
+			rs_yphon.conf.5			\
+			rs_yphon-rs_yncd.conf.5	\
+			rs_mkrs_yncd_conf.8				\
+			rs_mkclientnetboot.8				\
+			rs_mkbootpackage.8		\
+			rs_installbtimage.8		\
+			rs_monitor.8			\
+			rs_monitortk.8			\
+			rs_pcp.8			\
+			rs_psh.8			\
+			rs_pushinstall.8		\
+			rs_pushoverrides.8		\
+			rs_mkautoinstalldisk.8		\
+			rs_netbootmond.8		\
+			rs_clusterconfig.8		\
+			rs_pushupdate.8
 
-CLIENT_MAN = rsprepareclient.8 rsupdateclient.8
+CLIENT_MAN = rs_prepareclient.8 rs_updateclient.8
 
-COMMON_MAN = autoinstallscript.conf.5 rslsimage.8
+COMMON_MAN = autoinstallscript.conf.5 rs_lsimage.8
 
 .SUFFIXES: .5 .8 .8.gz .5.gz .pod .sgml
 
@@ -55,43 +49,43 @@ all:	compress
 %.gz:	%
 	gzip -9 < $< > $@
 
-rsyphon.conf.5:	rsyphon.conf.pod
+rs_yphon.conf.5:	rs_yphon.conf.pod
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 5 -c "Rsyphon" $< $@
 
-rsyphon-rsyncd.conf.5:	rsyphon-rsyncd.conf.pod
+rs_yphon-rs_yncd.conf.5:	rs_yphon-rs_yncd.conf.pod
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 5 -c "Rsyphon" $< $@
 
-rsinstallbtimage.8: $(TOPDIR)/sbin/rsinstallbtimage
+rs_installbtimage.8: $(TOPDIR)/sbin/rs_installbtimage
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 8 -c "Rsyphon" $< $@
 
-rsmonitor.8: $(TOPDIR)/sbin/rsmonitor
+rs_monitor.8: $(TOPDIR)/sbin/rs_monitor
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 8 -c "Rsyphon" $< $@
 
-rsmonitortk.8: $(TOPDIR)/sbin/rsmonitortk
+rs_monitortk.8: $(TOPDIR)/sbin/rs_monitortk
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 8 -c "Rsyphon" $< $@
 
-rspcp.8: $(TOPDIR)/sbin/rspcp
+rs_pcp.8: $(TOPDIR)/sbin/rs_pcp
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 8 -c "Rsyphon" $< $@
 
-rspsh.8: $(TOPDIR)/sbin/rspsh
+rs_psh.8: $(TOPDIR)/sbin/rs_psh
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 8 -c "Rsyphon" $< $@
 
-rspushinstall.8: $(TOPDIR)/sbin/rspushinstall
+rs_pushinstall.8: $(TOPDIR)/sbin/rs_pushinstall
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 8 -c "Rsyphon" $< $@
 
-rspushoverrides.8: $(TOPDIR)/sbin/rspushoverrides
+rs_pushoverrides.8: $(TOPDIR)/sbin/rs_pushoverrides
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 8 -c "Rsyphon" $< $@
 
-rsmkautoinstalldisk.8: $(TOPDIR)/sbin/rsmkautoinstalldisk
+rs_mkautoinstalldisk.8: $(TOPDIR)/sbin/rs_mkautoinstalldisk
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 8 -c "Rsyphon" $< $@
 
-rsnetbootmond.8: $(TOPDIR)/sbin/rsnetbootmond
+rs_netbootmond.8: $(TOPDIR)/sbin/rs_netbootmond
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 8 -c "Rsyphon" $< $@
 
-rsclusterconfig.8: $(TOPDIR)/sbin/rsclusterconfig
+rs_clusterconfig.8: $(TOPDIR)/sbin/rs_clusterconfig
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 8 -c "Rsyphon" $< $@
 
-rspushupdate.8: $(TOPDIR)/sbin/rspushupdate
+rs_pushupdate.8: $(TOPDIR)/sbin/rs_pushupdate
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 8 -c "Rsyphon" $< $@
 
 %.5 %.8:	%.sgml %.content.sgml
