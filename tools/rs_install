@@ -2,10 +2,6 @@
 #
 # "Rsyphon"
 #
-#  Copyright (C) 2002 Hewlett-Packard Company <dannf@fc.hp.com>
-#
-#  $Id$
-#
 # 
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -26,8 +22,8 @@
 #
 #  STRING                                  VALUE
 #  ----------------------------------------------------------------------
-#  SYSTEMIMAGER_VERSION_STRING             contents of the VERSION file
-#  SYSTEMIMAGER_FLAVOR_STRING              contents of the FLAVOR file
+#  RSYPHON_VERSION_STRING             contents of the VERSION file
+#  RSYPHON_FLAVOR_STRING              contents of the FLAVOR file
 #  USR_PREFIX                              /usr/local by default.  override
 #                                          by passing --si-prefix=<path>
 #
@@ -148,8 +144,8 @@ else
 	    INSTALL_OPTS="$INSTALL_OPTS $1"
 	else
 	    outfile=$TEMP_DIR/$(basename $1)
-	    sed -e s!"SYSTEMIMAGER_VERSION_STRING"!"$RS_VERSION"! \
-            -e s!"SYSTEMIMAGER_FLAVOR_STRING"!"$RS_FLAVOR"! \
+	    sed -e s!"RSYPHON_VERSION_STRING"!"$RS_VERSION"! \
+            -e s!"RSYPHON_FLAVOR_STRING"!"$RS_FLAVOR"! \
             -e s!"USR_PREFIX"!"$RS_PREFIX"! \
             $1 > $outfile
 	    INSTALL_OPTS="$INSTALL_OPTS $outfile"
