@@ -1,19 +1,19 @@
 <!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V4.1//EN" [
-  <!ENTITY siaddclients              SYSTEM "../man/rsaddclients.content.sgml">
+  <!ENTITY rsaddclients              SYSTEM "../man/rs_addclients.content.sgml">
   <!ENTITY autoinstallscript.conf  SYSTEM "../man/autoinstallscript.conf.content.sgml">
-  <!ENTITY sicpimage                 SYSTEM "../man/rscpimage.content.sgml">
-  <!ENTITY sigetimage                SYSTEM "../man/rsgetimage.content.sgml">
-  <!ENTITY silsimage                 SYSTEM "../man/rslsimage.content.sgml">
-  <!ENTITY simkautoinstallcd         SYSTEM "../man/rsmkautoinstallcd.content.sgml">
-  <!ENTITY simkautoinstallscript     SYSTEM "../man/rsmkautoinstallscript.content.sgml">
-  <!ENTITY simkbootserver            SYSTEM "../man/rsmkbootserver.content.sgml">
-  <!ENTITY simkdhcpserver            SYSTEM "../man/rsmkdhcpserver.content.sgml">
-  <!ENTITY simkdhcpstatic            SYSTEM "../man/rsmkdhcpstatic.content.sgml">
-  <!ENTITY simvimage                 SYSTEM "../man/rsmvimage.content.sgml">
-  <!ENTITY siprepareclient           SYSTEM "../man/rsprepareclient.content.sgml">
-  <!ENTITY sirmimage                 SYSTEM "../man/rsrmimage.content.sgml">
-  <!ENTITY simkrsyncdconf            SYSTEM "../man/rsmkrsyncd_conf.content.sgml">
-  <!ENTITY siupdateclient            SYSTEM "../man/rsupdateclient.content.sgml">
+  <!ENTITY rscpimage                 SYSTEM "../man/rs_cpimage.content.sgml">
+  <!ENTITY rsgetimage                SYSTEM "../man/rs_getimage.content.sgml">
+  <!ENTITY rslsimage                 SYSTEM "../man/rs_lsimage.content.sgml">
+  <!ENTITY rsmkautoinstallcd         SYSTEM "../man/rs_mkautoinstallcd.content.sgml">
+  <!ENTITY rsmkautoinstallscript     SYSTEM "../man/rs_mkautoinstallscript.content.sgml">
+  <!ENTITY rsmkbootserver            SYSTEM "../man/rs_mkbootserver.content.sgml">
+  <!ENTITY rsmkdhcpserver            SYSTEM "../man/rs_mkdhcpserver.content.sgml">
+  <!ENTITY rsmkdhcpstatic            SYSTEM "../man/rs_mkdhcpstatic.content.sgml">
+  <!ENTITY rsmvimage                 SYSTEM "../man/rs_mvimage.content.sgml">
+  <!ENTITY rsprepareclient           SYSTEM "../man/rs_prepareclient.content.sgml">
+  <!ENTITY rsrmimage                 SYSTEM "../man/rs_rmimage.content.sgml">
+  <!ENTITY rsmkrsyncdconf            SYSTEM "../man/rs_mkrsyncd_conf.content.sgml">
+  <!ENTITY rsupdateclient            SYSTEM "../man/rs_updateclient.content.sgml">
 
   <!ENTITY chapter1                SYSTEM "intro.sgml">
   <!ENTITY chapter2                SYSTEM "installation.sgml">
@@ -29,18 +29,18 @@
 
   <!ENTITY SIVERSION               SYSTEM "../../VERSION">
 
-  <!ENTITY dhfirstname             "<firstname>dann</firstname>">
-  <!ENTITY manfirstname            "<firstname>dann</firstname>">
-  <!ENTITY dhsurname               "<surname>frazier</surname>">
-  <!ENTITY mansurname              "<surname>frazier</surname>">
-  <!ENTITY dhdate                  "<date>November  10, 2002</date>">
-  <!ENTITY mandate                 "<date>November  10, 2002</date>">
+  <!ENTITY dhfirstname             "<firstname>william</firstname>">
+  <!ENTITY manfirstname            "<firstname>william</firstname>">
+  <!ENTITY dhsurname               "<surname>kennedy</surname>">
+  <!ENTITY mansurname              "<surname>kennedy</surname>">
+  <!ENTITY dhdate                  "<date>October 19, 2017</date>">
+  <!ENTITY mandate                 "<date>October  19, 2017</date>">
   <!ENTITY dhsection               "<manvolnum>8</manvolnum>">
   <!ENTITY mansection              "<manvolnum>8</manvolnum>">
-  <!ENTITY dhemail                 "<email>dannf@dannf.org</email>">
-  <!ENTITY manemail                "<email>dannf@dannf.org</email>">
-  <!ENTITY dhusername              "dann">
-  <!ENTITY manusername             "dann">
+  <!ENTITY dhemail                 "<email>william@a9group.net</email>">
+  <!ENTITY manemail                "<email>william@a9group.net</email>">
+  <!ENTITY dhusername              "wjk">
+  <!ENTITY manusername             "wjk">
 
   <!ENTITY debian                  "<productname>Debian GNU/Linux</productname>">
   <!ENTITY gnu                     "<acronym>GNU</acronym>">
@@ -48,26 +48,13 @@
 
 <book>
  <bookinfo>
-  <title>Rsyphon<superscript>&#174;</superscript> v&SIVERSION; Manual</title>
+  <title>Rsyphon v&SIVERSION; Manual</title>
   <pubdate>$Date$</pubdate>
   
-  <authorgroup>
-   <collab><collabname>Andrea Righi</collabname></collab>
-   <collab><collabname>Ari Jort</collabname></collab>
-   <collab><collabname>Austin Gonyou</collabname></collab>
-   <collab><collabname>Ben Spade</collabname></collab>
-   <collab><collabname>Brian Elliott Finley</collabname></collab>
-   <collab><collabname>Curtis Zinzilieta</collabname></collab>
-   <collab><collabname>Dann Frazier</collabname></collab>
-   <collab><collabname>Denise Walters</collabname></collab>
-   <collab><collabname>Greg Pratt</collabname></collab>
-   <collab><collabname>Jason R. Mastaler</collabname></collab>
-   <collab><collabname>Josh Aas</collabname></collab>
-  </authorgroup>
   <abstract>
    <para>
-    <application>Rsyphon</application> was created by Brian Elliott Finley.
-    The current maintainer and team lead of the project is Andrea Righi.
+    <application>Rsyphon</application> is forked from SystemImager by Brian Elliott Finley.
+    The current maintainer and team lead of the project is William Kennedy.
    </para>
 
    <para>
@@ -104,7 +91,7 @@
   <legalnotice>
    <title>Trademark Notices</title>
    <para>
-    Rsyphon<superscript>&#174;</superscript> is a registered trademark of
+    SystemImager<superscript>&#174;</superscript> is a registered trademark of
     Brian Finley.
    </para>
    <para>
