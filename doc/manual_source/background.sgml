@@ -1,0 +1,115 @@
+<chapter>
+  <title>Rsyphon Background</title>
+  <section>
+    <title>Design Goals</title>
+    <para>
+      The design goal for Rsyphon was to create a tool that was both easy
+      and fast to use, allowing system administrators to perform incremental
+      upgrades that minimized system disruptions and provided software
+      independent of any packaging system.  The specific requirements follow:
+    </para>
+    <itemizedlist>
+      <listitem>
+	<para>
+	  Images should be pulled from a working system.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  Unattended installs are a must.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  The unattended install system has to be able to repartition the 
+	  destination drive(s).
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  System administrators who don't completely understand the tool should
+	  be able to use it.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  The install should be easy and quick so that it can be useful
+	  immediately without a lot of site-specific customization.  
+	</para>
+      </listitem>
+      
+	<listitem>
+	<para>
+	  Images should be stored as normal files to allow for incremental
+	  upgrades, as opposed to "dd" style block level images of physical 
+	  disks.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  The Rsyphon software should be independent of any and all
+	  packaging systems (such as RPM) in order to easily accommodate
+	  different distributions.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  Rsyphon should be able to store multiple images for different
+	  types of systems and for revision control.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  A mechanism should be available to let unattended install clients
+	  know which image to install. 
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  An installed client  should be able to update itself to a new or
+	  modified image.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  Rsyphon should have a command line interface that can easily be
+	  wrapped with a GUI.
+	</para>
+      </listitem>
+      
+    </itemizedlist>
+  </section>
+  <section>
+    <title>Development of Rsyphon Architecture</title>
+    <para>
+      Minimal system requirements were a top priority for Rsyphon, which
+      began as a series of utilities written as shell scripts.  However, shell
+      scripts were inadequate as Rsyphon matured and its utilities became
+      more complex.  Perl, part of most Linux installs and possessing minimal system
+      requirements, then replaced shell scripts.  Using Perl, developers have
+      been able to generate cleaner, more advanced code.
+    </para>
+    
+    <para>
+      Rsyphon architecture was designed to be open to modification at
+      every level.  The protocol for transferring files during installs
+      and updates is currently <filename>rsync(1)</filename>, but the modular
+      code easily allows drop-in replacements as is appropriate.  All unicast
+      file transfer mechanisms, including <filename>rsync(1)</filename> are 
+      implemented in a "pull" fashion, which is generally considered to be 
+      superior to a "push," because it is much easier to monitor the state of 
+      the receiving system prior to and during the
+      file transfers.  However, multicast may be an option in the future and
+      may need to be implemented as a "push."
+    </para>
+  </section>
+</chapter>

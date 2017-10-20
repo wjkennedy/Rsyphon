@@ -1,0 +1,1399 @@
+#!/usr/bin/perl -w
+#
+#   "Rsyphon"
+# 
+#   Copyright (C) 1999-2006 Brian Elliott Finley
+#   Copyright (C) 2002 Internation Business Machines
+#                      Sean Dague <sean@dague.net>
+#
+#   $Id$
+#    vi:set filetype=perl: 
+#
+#   2004.02.02 Brian Elliott Finley
+#   - add '--server' option
+#   2004.06.01 Brian Elliott Finley
+#   - set rsyncd.conf's host_allow to _not_ include localhost
+#   2004.10.12  Brian Elliott Finley
+#   - prefer parted over sfdisk, unless i386.  was failing on ppc.
+#   2005.01.12  Brian Elliott Finley
+#   - add --exclude DISK option
+#   2005.01.29  Andrea Righi <a.righi@cineca.it>
+#   - add lvm information saving
+#
+#
+#   Function: rsprepareclient is used to, well, prepare a client to have 
+#   its image retrieved by an imageserver
+# 
+#   This is a port to Perl of the original bash script written by 
+#   Brian Elliott Finley.  Some of the bash code was contributed by 
+#   Jose AP Celestino <japc@sl.pt>.
+# 
+#   This program is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; either version 2 of the License, or
+#   (at your option) any later version.
+# 
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+# 
+#   You should have received a copy of the GNU General Public License
+#   along with this program; if not, write to the Free Software
+#   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+#
+#   Brian's thoughts:
+#
+#   My wedding ring has Hebrew writing around it's circumference.  When people
+#   ask me what it says, I usually say "Live to ride.  Ride to live."  But it
+#   actually says: "I am my beloved's and she is mine" which is adapted from the
+#   Song of Solomon.  http://www.bible.org/netbible/sos7.htm
+#
+#   The Beloved:
+#
+#     7:10 I am my beloved's,
+#     and he desires me!
+#    
+#
+#   The Beloved to Solomon:
+#    
+#     7:11 Come, my beloved, let us go to the countryside;
+#     let us spend the night in the villages.
+#    
+#     7:12 Let us rise early to go to the vineyards,
+#     to see if the vines have budded,
+#     to see if their blossoms have opened,
+#     if the pomegranates are in bloom?
+#     there I will give you my love.
+#    
+#     7:13 The mandrakes send out their fragrance;
+#     over our door is every delicacy,
+#     both new and old, which I have stored up for you, my lover. 
+#
+
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use strict;
+use Carp;
+use Cwd 'abs_path';
+use POSIX;
+use File::Copy;
+use File::Path;
+use File::Basename;
+use Getopt::Long;
+use vars qw($VERSION);
+use Rsyphon::Common;
+use Rsyphon::UseYourOwnKernel;
+
+# set version
+$VERSION = "SYSTEMIMAGER_VERSION_STRING";
+
+# set extension to use when backing up config files
+my $backup_extension = ".before_rsyphon-$VERSION";
+
+# configuration directory
+my $rsyphondir = "/etc/rsyphon";
+
+# location of temporary rsyncd.conf file
+my $rsyncd_conf_file = tmpnam();
+
+# location of temporary log file
+my $rsyncd_log_file = tmpnam();
+
+# set path
+$ENV{PATH} = "/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin";
+
+# we rely on english text when parsing command output
+$ENV{"LANG"} = "C";
+
+# port used by rsync daemon
+my $RSYNC_PORT = 873;
+
+my $progname = basename $0;
+
+my $version_info = <<"EOF";
+$progname (part of Rsyphon) v$VERSION
+
+Copyright (C) 1999-2006 Brian Elliott Finley
+
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOF
+
+my $help_info = $version_info . <<"EOF";
+
+Usage: $progname [OPTION]...
+
+Options:
+ --version
+    Display version and copyright information.
+
+ -h, --help
+    Display this output.
+
+ -s IMAGESERVER, --server IMAGESERVER
+    Where IMAGESERVER is either the IP address or host name of your
+    Rsyphon server.  Prepareclient makes your golden client's root
+    filesystem readable to other rsync capable machines.  While this
+    access is read only, it may expose sensitive information.  This
+    option limits access so that only your Rsyphon server can read
+    your golden client's root filesystem.
+
+ -n, --no-rsyncd, --norsyncd
+    Do not start the rsync daemon.
+
+ -y, --yes
+    Answer yes to all yes/no questions.
+
+ -e DISK, --exclude-disk [-e DISK...]
+    Do not gather partition information for DISK(s).  The result of
+    using this option, is that DISK(s) will not be partitioned during
+    the auto-install process.
+
+    You may prefix DISK with "/dev/", but it is not necessary, and a
+    base directory of /dev/ will be assumed.
+
+    Example: -e /dev/sdb -e sdc -e /dev/ida/c0d0 -e ida/c0d1
+
+ -q, --quiet
+    Run silently.  Return an exit status of 0 for success or a non-zero
+    exit status for failure.
+
+ --unit MB | %
+    Use the specified unit of measurement to save disk informations. If
+    MB is specified the size of the partitions will be reported in
+    absolute values, otherwise with '%' all the values will be reported
+    in percentage relative to the total disk size. Default is MB.
+
+ --no-uyok
+    Don't create a UYOK (Use Your Own Kernel) boot package.  This option
+    is advantageous if you know you don't need a UYOK kernel, and you
+    want this command to complete faster.
+
+ --my-modules
+    Only include the modules that are currently loaded on this machine
+    when creating the UYOK (Use Your Own Kernel) initrd.img.
+
+    Without this option, all available modules are included whether or
+    not they are currently in use (except for those listed in the
+    /etc/rsyphon/UYOK.modules_to_exclude file).
+
+    Including all modules allows your UYOK kernel and initrd.img to be
+    used with a greater variety of client hardware, but can make the
+    resultant initrd.img much larger.
+
+ --include-system-firmware
+    Include the firmwares that are currently installed on this machine
+    when creating the initrd.img.
+
+    Including all installed firmwares allors you initrd.img to be used
+    with a greater variety of client hardware, but can make the resultant
+    initrd.img larger.
+
+ --kernel KERNEL
+    Do not detect the kernel to use with UYOK, but instead use the
+    file specified by the argument KERNEL.
+    Use this parameter only if you use UYOK feature.
+
+ --modules-dir DIR
+    Get kernel modules to use with UYOK from the DIR repository.
+    Use this parameter only with --kernel and only if you use UYOK
+    feature.
+
+ --firmware-dir DIR
+    Get the firmwares to use from the DIR repository.
+    Use this parameter only with --include-system-firmware.
+
+ --image IMAGENAME
+    Get kernel and kernel modules automatically from the image specified
+    by IMAGENAME to use with UYOK (if executed on image server).
+    Use this parameter only if you use UYOK feature.
+
+ --filesystem FILESYSTEM
+    Force the use of FILESYSTEM to create the initial ramdisk. Use the
+    filesystem name as specified in /proc/filesystems.
+    Important: the filesystem must be statically compiled in the kernel
+    used to install the clients.
+
+ --ssh-key FILE
+    Where FILE is the SSH2 id_dsa or id_rsa private key of the user account
+    that the autoinstall client will use to connect to the imageserver.
+
+ --authorized-keys FILE
+    Specifies the file that contains the public keys that can be used
+    for user authentication from the image server to the imaging clients.
+
+ --config FILE
+    Where FILE contains all the settings necessary for the client to set
+    its hostname and configure its networking information without DHCP.
+    This file is copied to /local.cfg into the initrd.img.  See
+    /usr/share/doc/rsyphon-server-SYSTEMIMAGER_VERSION_STRING/local.cfg
+    for a well commented example.
+
+Download, report bugs, and make suggestions at:
+http://rsyphon.org/
+
+EOF
+
+
+GetOptions(
+    "explicit"             => \my $explicit,
+    "help"                 => \my $help,
+    "exclude-disk|e=s"     => \my @exclude_disk,
+    "no-rsyncd|norsyncd|n" => \my $norsyncd,
+    "quiet|q"              => \my $quiet,
+    "no-uyok"              => \my $no_uyok,
+    "unit=s"               => \my $unit_of_measurement,
+    "my-modules"           => \my $my_modules,
+    "kernel=s"             => \my $custom_kernel,
+    "modules-dir=s"        => \my $modules_dir,
+    "image=s"              => \my $image,
+    "filesystem=s"         => \my $filesystem,
+    "version"              => \my $version,
+    "server|s=s"           => \my $server,
+    "yes|y"                => \my $yes,
+    "ssh-key=s"            => \my $ssh_key,
+    "authorized-keys=s"    => \my $authorized_keys,
+    "config=s"             => \my $local_cfg,
+    "include-system-firmware" => \my $system_firmware,
+    "firmware-dir=s"       => \my $firmware_dir,
+) || die "$help_info";
+
+my $arch = Rsyphon::UseYourOwnKernel::_get_arch();
+
+# Force --my-modules option when on PS3 because there is no point to include other modules
+if ( $arch eq "ppc64-ps3" ) {
+    $my_modules = 1;
+}
+
+### BEGIN option validation ###
+# show version if requested
+if($version) {
+    print $version_info;
+    exit 0;
+}
+
+# give help if requested
+if($help) {
+    print "$help_info";
+    exit 0;
+}
+
+# bail if not root
+if ($> != 0) {
+    print "Must be run as root!\n";
+    exit 1;
+}
+
+if($no_uyok and $my_modules) {
+    print "FATAL:  --no-uyok option conflicts with --my-modules!\n";
+    print qq(Try "$progname --help" for more info.\n);
+    exit 1;
+}
+
+if(!($custom_kernel) and $modules_dir) {
+    print "FATAL:  --modules-dir DIR option must be used in conjunction with --kernel KERNEL!\n";
+    print qq(Try "$progname --help" for more info.\n);
+    exit 1;
+}
+
+if($custom_kernel and !($modules_dir)) {
+    system('clear') unless (($quiet) or ($yes));
+    print "WARNING: --kernel KERNEL used without --modules-dir DIR option!\n";
+    print qq(You can use this option only if KERNEL is a monolithic kernel,\n) .
+          qq(or if the needed modules are already present in the initrd.img.\n\n);
+    unless (($quiet) or ($yes)) {
+        print "Continue? (y/[n]): ";
+        my $answer = <>;
+        unless($answer =~ /y/i) {
+            print "Client prepartion cancelled.  No files modified.\n";
+            exit 1;
+        }
+    }
+}
+
+if($my_modules and $modules_dir) {
+    print "FATAL:  --my-modules option conflicts with --modules-dir DIR!\n";
+    print qq(Try "$progname --help" for more info.\n);
+    exit 1;
+}
+
+if($no_uyok and $custom_kernel) {
+    print "FATAL:  --no-uyok option conflicts with --kernel KERNEL!\n";
+    print qq(Try "$progname --help" for more info.\n);
+    exit 1;
+}
+
+if($no_uyok and $modules_dir) {
+    print "FATAL:  --no-uyok option conflicts with --modules-dir DIR!\n";
+    print qq(Try "$progname --help" for more info.\n);
+    exit 1;
+}
+
+if($no_uyok and $image) {
+    print "FATAL:  --no-uyok option conflicts with --image IMAGENAME!\n";
+    print qq(Try "$progname --help" for more info.\n);
+    exit 1;
+}
+
+if($custom_kernel and $image) {
+    print "FATAL:  --kernel KERNEL option conflicts with --image IMAGENAME!\n";
+    print qq(Try "$progname --help" for more info.\n);
+    exit 1;
+}
+
+if($my_modules and $image) {
+    print "FATAL:  --my-modules option conflicts with --image IMAGENAME!\n";
+    print qq(Try "$progname --help" for more info.\n);
+    exit 1;
+}
+
+if (($filesystem) &&
+    ($filesystem !~ m/$Rsyphon::UseYourOwnKernel::fs_regexp/)) {
+    print "FATAL:  unsupported filesystem: $filesystem!\n";
+    exit 1;
+}
+
+if (($server) && ($norsyncd)) {
+    print "FATAL:  --server option conflicts with --no-rsyncd!\n";
+    print qq(Try "$progname --help" for more info.\n);
+    exit 1;
+}
+
+if($firmware_dir) {
+    # If firmware_dir is defined: --firmware-dir option is used.
+    # 1: Check that --firmware-dir is not used without --include-system-firmware (no sens)
+    if(!($system_firmware)) {
+        print "FATAL:  --firmware-dir option used without --include-system-firmware !\n";
+        print qq(Try "$progname --help" for more info.\n);
+        exit 1;
+    }
+    # 2: Check that firmware_dir value points to a directory.
+    if( ! -d $firmware_dir) {
+        print "FATAL:  firmware dir $firmware_dir not found!\n";
+        exit 1;
+    }
+}
+# If firmware_dir is undefined, leave it undefined, the case is handeled in UseYourOwnKernel.pm
+
+# Make sure we have certain tools that we need.
+which('rsync') or croak("'rsync' is required for $progname to function properly.  Please see http://rsyphon.org for more details.");
+which('systemconfigurator') or croak("'systemconfigurator' is required for $progname to function properly.  Please see http://rsyphon.org for more details.");
+
+my $hosts_allow;
+if($server) {
+        if($server =~ m/^(\d{1,3}\.){3}\d{1,3}$/) {
+                $hosts_allow .= "${server}/32";
+        } else {
+                my @ips = get_ips($server);
+                foreach (@ips) {
+                        $hosts_allow .= "${_}/32 ";
+                }
+        }
+} elsif (!($norsyncd)) {
+        print "$help_info";
+        print "Try the --server option.\n\n";
+        exit 1;
+}
+### END option validation ###
+
+
+unless(($quiet) or ($yes)) {
+    # do the interactive part
+    system("clear");
+    print <<EOF;
+Welcome to the Rsyphon $progname command.  This command may modify
+the following files to prepare your golden client for having it's image 
+retrieved by the imageserver.  It will also create the /etc/rsyphon 
+directory and fill it with information about your golden client.  All modified
+files will be backed up with the $backup_extension extension.
+
+ /etc/services:
+   This file defines the port numbers used by certain software on your system.
+   Entries for rsync will be added if necessary.
+
+ $rsyncd_conf_file:
+   This is a temporary configuration file that rsync needs on your golden client
+   in order to make your filesystem available to your Rsyphon server.
+
+ inetd configuration:
+   Rsyphon needs to run rsync as a standalone daemon on your golden client
+   until it's image is retrieved by your Rsyphon server.  If rsyncd is 
+   configured to run as a service started by inetd, it will be temporarily
+   disabled, and any running rsync daemons or commands will be stopped.  Then,
+   an rsync daemon will be started using the temporary configuration file
+   mentioned above.
+   
+See "$progname --help" for command line options.
+
+EOF
+
+    print "Continue? (y/[n]): ";
+    my $answer = <>;
+    unless($answer =~ /y/i) {
+        print "Client prepartion cancelled.  No files modified.\n";
+        exit 1;
+    }
+    
+    unless ($norsyncd) {
+        system("clear");
+        print <<EOF;
+*********************************** WARNING *********************************** 
+This utility starts an rsync daemon that makes all of your files accessible
+by anyone who can connect to the rsync port of this machine.  This is the 
+case until you reboot, or kill the 'rsync --daemon' process by hand.  By 
+default, once you use rsgetimage to retrieve this image on your imageserver, 
+these contents will become accessible to anyone who can connect to the rsync 
+port on your imageserver.  See rsyncd.conf(5) for details on restricting 
+access to these files on the imageserver.  See the rsyphon-ssh package
+for a more secure method of making images available to clients.
+*********************************** WARNING *********************************** 
+
+EOF
+
+  
+        # you sure you want to install?
+        print "Continue? (y/[n]): ";
+        $answer = <>;
+        unless($answer =~ /y/i) {
+            print "Client prepartion cancelled.  No files modified.\n";
+            exit 1;
+        }
+        # Check if a firewall is present in the client.
+        system "iptables --list 2>&1 | grep -q DROP";
+        unless ($?) {
+            print <<"EOF";
+
+*********************************** WARNING *********************************** 
+A firewall seems to be running on this host!!!
+Be sure that port 873/rsync is opened for: $hosts_allow
+*********************************** WARNING *********************************** 
+
+EOF
+            print "Continue? (y/[n]): ";
+            $answer = <>;
+            unless($answer =~ /y/i) {
+                print "Client prepartion cancelled.  No files modified.\n";
+                exit 1;
+            }
+        }
+    }
+
+    #
+    # Deal with supermount module
+    #
+    system("clear") unless (($quiet) or ($yes));
+    my @supermounts;
+    open(MOUNT, "mount |");
+        while(<MOUNT>) {
+            my @fields = split;
+            if("$fields[4]" eq "supermount") {
+                push @supermounts, $fields[2];
+            }
+        }
+    close(MOUNT);
+    
+    if (@supermounts) {
+        print << "EOF";
+You appear to have mount points managed by the supermount kernel module.  These
+supermount managed mount points will cause your image retrieval to fail, unless
+they are unmounted.  
+
+Devices managed by supermount are typically CDROM and floppy devices, which
+won't be retrieved by Rsyphon anyway, so unmounting these devices should
+cause no harm.  You can safely re-mount them after running the rsgetimage 
+command from your Rsyphon server.
+
+Here are the mount points on this system that are managed by supermount:
+EOF
+
+        print "\n";
+        foreach (@supermounts) {
+            print "    $_\n";
+        }
+        print "\n";
+        print "Rsyphon needs to unmount these to continue.\n\n";
+
+        print "Continue? (y/[n]): ";
+        my $answer = <>;
+        unless($answer =~ /y/i) {
+            print "Client prepartion cancelled.  No files modified.\n";
+            exit 1;
+        }
+        foreach (@supermounts) {
+            my $cmd = "umount $_";
+            !system($cmd) or die("Couldn't $cmd.");
+        }
+    }
+ 
+    unless ($norsyncd) {
+        my $result;
+        $result = `ps axww|grep -v grep|grep -w rsync`;
+        if (!$result) {
+            $result = `ps axww|grep -v grep|grep -w rsyncd`;
+        }
+        if ($result) {
+            print "One or more rsync daemons appear to be running on this machine.  If you\n";
+            print "continue, those daemons will be killed.\n";
+            print "\n";
+            print "Continue? (y/[n]): ";
+            my $answer = <>;
+            unless($answer =~ /y/i) {
+                print "Client prepartion cancelled.  No files modified.\n";
+                exit 1;
+            }
+        }
+    }
+}
+
+# if quiet redirect all to /dev/null
+if ($quiet) {
+    open(STDERR, '>/dev/null');
+    open(STDOUT, '>/dev/null');
+}
+
+# verify that rsync entry is in /etc/services
+add_rsync_services();
+
+# process user specified list of disks to exclude
+my %excluded_disks;
+foreach(@exclude_disk) {
+	
+	# Strip off the /dev/ part.  It's just for user non-confusion anyway. -BEF-
+	$_ =~ s#^/dev/##;
+	$_ =~ s#^/##;	# lose a leading / if someone happened to use one (Ie. /sda).
+
+	#
+	# Put entries without /dev/ prefixes into hash, and set the values to match
+	# the keys so that we can do a simple "if defined" test later. 
+	# -BEF- 2005.01.12
+	#
+	$excluded_disks{$_} = $_;
+}
+
+# comment out rsync entry in inetd.conf if it exists
+temporarily_disable_rsync_in_inetd();
+
+# get rid of xinetd configuration for rsync if it exits
+temporarily_disable_rsync_in_xinetd();
+
+# Collect all the disk information
+my $disks = collect_disks();
+
+# Create /etc/rsyphon/autoinstallscript.conf
+create_auto_install_script_conf($disks);
+
+# Create /etc/systemimage/byid_real_map.conf
+create_byid_real_map_conf();
+
+# Run the rsync daemon for getimage?
+unless($norsyncd) {
+
+    # install Rsyphon brand rsyncd.conf file ($rsyncd_conf_file)
+    create_rsyncd_conf($rsyncd_conf_file);
+    
+    # rsync < v2.5.x requires that a host have an entry with it's hostname
+    # in it's /etc/hosts before rsync will start up in daemon mode.  I've 
+    # always wanted a better way of doing this than simply adding an entry
+    # and leaving it there.  It's usually harmless, but I prefer to not leave
+    # footprints.  I've determined that if you add an entry, start up rsync
+    # in daemon mode, then remove the entry, things work fine.  So now we do 
+    # just that. -BEF-
+    my $hostname = (uname)[1];
+    my $file = "/etc/hosts";
+    
+    # kill off any running rsync daemons
+    killall("rsync",1);
+    killall("rsyncd",1);
+    
+    # Make a copy of the original /etc/hosts file.
+    my $source      = $file;
+    my $destination = "$file.before-$progname";
+    copy($source, $destination) or die "FATAL: Failed to copy $source to $destination.\n";
+    
+    # Append our temporary entry.
+    open(TMP,">>$file") or croak("Couldn't open $file for writing.");
+      print TMP "127.0.0.1  $hostname\n";
+    close(TMP);
+    
+    start_rsyncd();
+
+    # Put the original /etc/hosts file back (sans our temporary entry).
+    $source      = "$file.before-$progname";
+    $destination = $file;
+    move($source, $destination) or die "FATAL: Failed to copy $source to $destination.\n";
+}
+### END leave disk info behind for the getimage command ###
+
+# In the case that /etc/mtab is a symlink to /proc/mounts.  This 
+# method should still work.  This file we create here is also left 
+# behind for getimage. -BEF-
+system("mount > /etc/rsyphon/mounted_filesystems");
+
+# wrap up
+if(!$quiet and !$norsyncd) {
+    print <<EOF;
+
+This client is ready to have its image retrieved.  You must now run 
+the "rsgetimage" command on your imageserver.
+EOF
+
+} elsif(!$quiet) {
+    print <<EOF;
+
+WARNING:  The rsync daemon was not started.  You must run $progname 
+          again, without the -n option, before you can pull this 
+          client's image to an imageserver.
+EOF
+
+}
+
+unless(defined($no_uyok)) {
+    print <<"    EOF";
+
+Your client has been successfully prepared.  Boot kernel (copied from
+this Linux distribution) and an initrd.img (generated by the
+initrd_template package) can be found in /etc/rsyphon/boot.
+    EOF
+}
+
+# Automatically create a configuration file for systemconfigurator. This
+# file is needed by kexec stuff to chose the correct kernel, initrd and
+# an appropriate kernel append string to reboot the system just after
+# the imaging.
+unless ($image) {
+    print "\nAutomatically create configuration file for systemconfigurator:\n" .
+          "  >> /etc/systemconfig/systemconfig.conf\n";
+    if (create_systemconfig_conf() < 0) {
+        print STDERR "WARNING: coulnd't create file /etc/systemconfig/systemconfig.conf (needed by systemconfigurator)\n";
+    }
+}
+
+# Set the clean-up handlers for SIGINT, SIGHUP and die.
+$SIG{INT} = $SIG{HUP} = sub {
+    stop_rsyncd();
+    exit(1);
+};
+$SIG{__DIE__} = sub {
+    my ($msg) = @_;
+    print "$msg\n";
+    stop_rsyncd();
+    exit(1);
+};
+
+# Wait for the end of the cloning process.
+unless ($norsyncd) {
+    my $pid;
+    if ($pid = fork()) {
+        # Run in background.
+        exit(0);
+    } elsif (defined($pid)) {
+        open(STDIN, '/dev/null') or die("error: can't read from /dev/null: $!\n");
+        open(STDOUT, '>>/dev/null') or die("error: can't write to /dev/null: $!\n");
+        open(STDERR, '>>/dev/null') or die("error: can't write to /dev/null: $!\n");
+        wait_for_completion();
+        stop_rsyncd();
+    } else {
+        print STDERR "WARNING: the rsync daemon will be not stopped automatically!\n";
+    }
+}
+exit(0);
+
+### BEGIN functions
+# Rsyphon specific functions
+
+# Automatically create the configuration file for systemconfigurator.
+# XXX: only for kernel, initrd and kernel append string.
+sub create_systemconfig_conf
+{
+    my $sc_config_file = '/etc/systemconfig/systemconfig.conf';
+    unless (-d '/etc/systemconfig') {
+        # Create systemconfigurator directory.
+        mkdir('/etc/systemconfig') or
+            die("FATAL: couldn't create directory /etc/systemconfig!\n");
+    } elsif ((-e $sc_config_file) && (! -e $sc_config_file . ".save")) {
+        # Save a copy of the original configuration.
+        copy($sc_config_file, $sc_config_file . '.save') or
+            die("FATAL: failed to copy $sc_config_file to $sc_config_file.save!\n");
+    }
+
+    # Detect kernel release and kernel file.
+    my $kernel_file;
+    if ($custom_kernel) {
+        $kernel_file = $custom_kernel;
+    } else {
+        my $uname_r = Rsyphon::UseYourOwnKernel::get_uname_r();
+        $kernel_file = Rsyphon::UseYourOwnKernel::_choose_kernel_file($uname_r);
+        unless ($kernel_file) {
+            print STDERR "WARNING: unable to auto-detect kernel file!\n";
+            return -1;
+        }
+    }
+    my $kernel_release = Rsyphon::UseYourOwnKernel::_get_kernel_release($kernel_file);
+    unless ($kernel_release) {
+        print STDERR "WARNING: unable to detect kernel release of \"$kernel_file\"!\n";
+        return -1;
+    }
+
+    # Detect initrd.
+    my $initrd_file = Rsyphon::UseYourOwnKernel::_choose_initrd_file('/boot', $kernel_release);
+    unless ($initrd_file) {
+        print STDERR "FATAL: unable to detect an initrd for \"$kernel_release\"!\n";
+        return -1;
+    }
+
+    # Detect the append string.
+    open(IN, '</proc/cmdline') or
+        die("FATAL: couldn't open /proc/cmdline for reading (is /proc mounted?)\n");
+    chomp(my $append_string = <IN>);
+    close(IN);
+    # remove old root from append string (it'll be added later)
+    $append_string =~ s/root=\S+//;
+    # sort unique elements of append string
+    my %saw_params;
+    @saw_params{split(/\s/, $append_string)} = ();
+    $append_string = join(' ', sort keys %saw_params);
+
+    # Get mounted devices.
+    open(IN, 'mount |') or
+        die("FATAL: couldn't execute mount!\n");
+    chomp(@_ = <IN>);
+    close(IN);
+
+    # Detect root and boot devices from the mount output.
+    my $root_dev = (split(/ /, (grep(/ \/ /, reverse @_))[0]))[0];
+    unless ($root_dev) {
+        print STDERR "WARNING: unable to detect root device!\n";
+        return -1;
+    }
+    my @boots = grep(/ \/boot /, reverse @_);
+    my $boot_dev = (split(/ /, $boots[0]))[0] if (@boots);
+    unless ($boot_dev) {
+        # Unable to detect boot device (using the root device)
+        $boot_dev = $root_dev;
+    }
+    if ($boot_dev =~ /^\/dev\/([hs]|ps3)d/) {
+        # Standard disk naming (hd*, sd*, ps3d*).
+        $boot_dev =~ s/[0-9]+$//;
+    } else {
+        # Hardware RAID device.
+        $boot_dev =~ s/p[0-9]+$//;
+    }
+
+    # Resolve non-standard symlink names created by udev.
+    if (-l $boot_dev) {
+        $boot_dev = abs_path(readlink($boot_dev));
+    }
+    if (-l $root_dev) {
+        $root_dev = abs_path(readlink($root_dev));
+    }
+
+    # OK, we've all the info needed by systemconfigurator! Write the
+    # configuration file.
+    open(OUT, ">$sc_config_file") or
+        die("FATAL: couldn't open $sc_config_file for writing!\n");
+    print OUT << "EOF";
+[BOOT]
+ROOTDEV = $root_dev
+BOOTDEV = $boot_dev
+DEFAULTBOOT = rsyphon
+
+[KERNEL0]
+LABEL = rsyphon
+PATH = $kernel_file
+INITRD = $initrd_file
+APPEND = $append_string
+EOF
+    close(OUT);
+
+    return 0;
+}
+
+# a pure perl version of which
+sub which {
+    my $prog = shift;
+    foreach my $path (split(':',$ENV{PATH})) {
+        if(-x "$path/$prog") {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+#
+# Read /proc/partitions and figure out all the disks that need to have their 
+# partitions captured.
+#
+sub collect_disks {
+
+    my $disks;
+    my $devfsscsi = 0;
+
+    open(IN,"</proc/partitions") or croak("Couldn't open /proc/partitions for reading.");
+    while(<IN>) {
+
+        # Try to translate devfs disk names to the standard /dev names for
+        # hardware RAID disks with a non-standard naming schema.
+        # XXX: this works only with disks installed in the first hardware-RAID
+        #      controller. It seems that the only way to find the right
+        #      controller number is to look the major device number, that
+        #      unfortunately is different for all the hardware-RAID disks of
+        #      the different vendors that don't use a standard SCSI naming
+        #      schema (/dev/sd*).
+        if (/(\S*)\/disc([0-9]+)\/part([0-9]+)/) {
+            $_ = "${1}/c0d${2}p${3}";
+        }
+
+        if (/(\S*c[0-9]+d[0-9]+)p[0-9]+/) {
+            # hardware raid devices (/dev/rd/c?d?, /dev/ida/c?d?, /dev/cciss/c?d?)
+            my $disk = $1;
+            unless(defined $excluded_disks{$disk}) {
+                $disks->{HWRAID}->{$disk}++;
+            }
+
+        } elsif (/(\S*([hs]|ps3)d[a-z])[0-9]/) { # standard disk devices
+            my $disk = $1;
+            unless(defined $excluded_disks{$disk}) {
+                $disks->{IDESCSI}->{$disk}++;
+            }
+
+        } elsif (/\b(ide\/host\S+disc)\b/) { # devfs standard for ide disk devices
+            #          vvvvvvvvvvvvvvvvvvv -> strip off the partition number
+            my $disk = devfs_transform($1);
+
+            unless(defined $excluded_disks{$disk}) {
+                $disks->{IDESCSI}->{$disk}++;
+            }
+
+        } elsif (/\b(scsi\/host\S+disc)\b/) { # devfs standard for scsi disk devices
+
+            #
+            # If we have a devfs scsi disk and we want to get
+            # back to old school format, we just count up each disk
+            # and assign it to /dev/sdN in order.
+            #
+            my $disk = "sd" . chr(97 + $devfsscsi);
+            $devfsscsi++;
+
+            unless(defined $excluded_disks{$disk}) {
+                $disks->{IDESCSI}->{$disk}++;
+            }
+        }
+    }
+    close(IN);
+    return $disks;
+}
+
+
+# Usage:
+# create_auto_install_script_conf($disks);
+sub create_auto_install_script_conf {
+
+    my $disks = shift;
+
+    unless (($quiet) or ($yes)) { 
+        system("clear");
+    }
+
+    # Remove old-style partitionschemes directory if it exists. -BEF-
+    rmtree("$rsyphondir/partitionschemes");
+
+    # Where the configuration information be stored. -BEF-
+    my $file = "$rsyphondir/autoinstallscript.conf";
+
+    # Determine which partition tool is available.  Preference is sfdisk -- 
+    # it provides more information. -BEF-
+    #
+    my $partition_tool = which_partition_tool();
+
+    Rsyphon::Common->write_auto_install_script_conf_header($file);
+
+    # First we do Hardware RAID devices
+    foreach my $disk (sort keys %{$disks->{HWRAID}}) {
+
+        my $label_type = Rsyphon::Common->get_disk_label_type($partition_tool, $disk);
+        if (($label_type eq "gpt") and ($partition_tool eq "sfdisk")) {
+            $partition_tool = which_partition_tool("parted");
+        }
+        if (($label_type eq "bsd") and ($partition_tool eq "sfdisk")) {
+            $partition_tool = which_partition_tool("parted");
+        }
+        unless ($quiet) { 
+            print qq(Using "$partition_tool" to gather information about disk:\n);
+            print qq(    /dev/$disk\n);
+            print qq(\n);
+        }
+        Rsyphon::Common->save_partition_information($disk, $partition_tool, $file, $label_type, $unit_of_measurement);
+
+    }
+
+    # Now we do /dev/ide and /dev/sda disks
+    foreach my $disk (sort keys %{$disks->{IDESCSI}}) {
+
+        my $label_type = Rsyphon::Common->get_disk_label_type($partition_tool, $disk);
+        if (($label_type eq "gpt") and ($partition_tool eq "sfdisk")) {
+            $partition_tool = which_partition_tool("parted");
+        }
+        if (($label_type eq "bsd") and ($partition_tool eq "sfdisk")) {
+            $partition_tool = which_partition_tool("parted");
+        }
+        unless ($quiet) { 
+            print qq(Using "$partition_tool" to gather information about disk:\n);
+            print qq(    /dev/$disk\n);
+            print qq(\n);
+        }
+        Rsyphon::Common->save_partition_information($disk, $partition_tool, $file, $label_type, $unit_of_measurement);
+
+    }
+
+    Rsyphon::Common::save_soft_raid_information($file);
+
+    Rsyphon::Common::save_lvm_information($file);
+        
+    Rsyphon::Common->save_filesystem_information("/etc/fstab", $file);
+
+    ############################################################################
+    #
+    # Which devstyle should BOEL use?
+    #
+    open(FILE, ">>$file") or die("Couldn't open $file for appending.");
+        print FILE qq(\n);
+        print FILE qq(  <boel devstyle=");
+        print FILE Rsyphon::Common->which_dev_style();
+        print FILE qq("/>\n);
+        print FILE qq(\n);
+    close(FILE);
+    #
+    ############################################################################
+
+    unless(defined($no_uyok)) {
+        #
+        #   Do UYOK stuff
+        #
+        my $verbose;
+        unless($quiet) { $verbose = 1; }
+        Rsyphon::UseYourOwnKernel->create_uyok_initrd(
+            $arch, $my_modules, $custom_kernel, $modules_dir,
+            $image, $filesystem, '/etc/rsyphon/boot',
+            $ssh_key, $authorized_keys, $local_cfg,
+            $system_firmware, $firmware_dir, $verbose
+        );
+    }
+
+    Rsyphon::Common->write_auto_install_script_conf_footer($file);
+
+    #
+    # END partition_tool friendly output
+    #
+    return 1;
+}
+
+#Usage:
+# create_byid_real_map_conf()
+# the contant of the file is the used device name and real device name mapping
+# only works for suse
+sub create_byid_real_map_conf {
+    my %used_real_hash;
+    my $real_dev;
+    my $map_file = "/etc/rsyphon/byid_real_map.conf";
+    if ( -e $map_file ) {
+        unlink $map_file;
+    }
+    if ( -f "/etc/fstab" ) {
+        open(FH_IN, "</etc/fstab");
+        while(<FH_IN>) {
+            if ((/^\s*#/) or (/^\s*$/)) {
+                next;
+            }
+            my ($device_name, $temp_str) = split(/\s+/, $_, 2);
+            chomp $device_name;
+            $used_real_hash{$device_name} = 1;
+        }
+        close(FH_IN);
+    }
+
+    if ( -e "/boot/grub/device.map" ){
+        open(FH_IN, "</boot/grub/device.map");
+        while(<FH_IN>) {
+            if ((/^\s*#/) or (/^\s*$/)) {
+                next;
+            }
+
+            my ($temp_str, $device_name) = split(/\s+/, $_, 2);
+            chomp $device_name;
+            $used_real_hash{$device_name} = 1;
+        }
+        close(FH_IN);
+    }
+
+    if ( -e "/etc/grub.conf" ) {
+        my $device_name = '';
+        open(FH_IN, "</etc/grub.conf");
+        while(<FH_IN>) {
+            if ((/^\s*#/) or (/^\s*$/)) {
+                next;
+            }
+
+            if ( /root=([^\s]+)\s/ ) {
+                $device_name = $1;
+            }
+
+            if ( /resume=([^\s]+)\s+/) {
+                $device_name = $1;
+                $used_real_hash{$device_name} = 1;
+            }
+
+            $used_real_hash{$device_name} = 1;
+        }
+        close(FH_IN);
+    }
+
+    if ( -e "/boot/grub/menu.lst" ) {
+        my $device_name = '';
+        open(FH_IN, "</boot/grub/menu.lst");
+        while(<FH_IN>) {
+            if ((/^\s*#/) or (/^\s*$/)) {
+                next;
+            }
+
+            if ( /root=([^\s]+)\s+/ ) {
+                $device_name = $1;
+                $used_real_hash{$device_name} = 1;
+            }
+
+            if ( /resume=([^\s]+)\s+/) {
+                $device_name = $1;
+                $used_real_hash{$device_name} = 1;
+            }
+        }
+        close(FH_IN);
+    }
+
+    open(FH_OUT, ">$map_file");
+    my @temp_array = keys %used_real_hash;
+    my @reverse_sort_dev = sort {(length $b) <=> (length $a)} @temp_array;
+    foreach my $dev_name (@reverse_sort_dev) {
+        if ( $dev_name =~ /by-id/ ){
+            $real_dev = `readlink -f $dev_name`;
+            chomp $real_dev;
+            print FH_OUT "${dev_name}:${real_dev}\n";
+        }
+    }
+    close(FH_OUT);
+}
+
+# Usage:
+# my $partition_tool = which_partition_tool();
+# my $partition_tool = which_partition_tool("preferred_tool");
+sub which_partition_tool {
+
+        my $preferred_tool = shift;
+        my $partition_tool;
+        
+        # 
+        # We prefer sfdisk on x86, for everything else we prefer parted. -BEF-
+        # David Livingstone: sfdisk doesn't handle GPT partitions so we can't force the use of sfdisk.
+        #if($arch eq "i386") {
+        #        $preferred_tool = 'sfdisk';
+        #}
+        
+        # Check to see if preferred tool is available.
+        if ( ($preferred_tool) and (which("$preferred_tool")) ) {
+                $partition_tool = $preferred_tool;
+        
+        } else {
+        
+                # Determine which partition tool is available.  Preference is parted. -BEF-
+                if (which('parted')) { 
+                        $partition_tool="parted";
+
+                } elsif (which('sfdisk')) {
+                        $partition_tool="sfdisk";
+
+                } else {
+                        print qq(FATAL: I can't find an appropriate partition tool.  Please install "parted"\n);
+                        print qq(       or "sfdisk", depending on what's appropriate for your architecture!\n);
+                        exit 1;
+                }
+        
+        }
+        
+        return $partition_tool;
+}
+
+
+sub temporarily_disable_rsync_in_xinetd {
+    # this is the trouble file in an xinted environment
+    my $file = "/etc/xinetd.d/rsync";
+    if(-e $file) {
+	#
+        # Move rsync entry out of the way -- xinetd should ignore ~ files. -BEF-
+	#
+        move($file,$file . '~');
+
+	#
+	# restart xinetd with rsync disabled -BEF-
+	#
+        print "Signaling xinetd to restart...\n" unless($quiet);
+        killall('xinetd',12); # Send SIGHUP to all xinetd processes
+
+	#
+	# Put rsync entry back, so that we leave the system as we found it.
+	# Won't take effect though until system is rebooted, or xinetd 
+	# restarted again. -BEF-
+	#
+        move($file . '~',$file);
+    }
+    return 1;
+}
+
+sub temporarily_disable_rsync_in_inetd {
+    my $file = "/etc/inetd.conf";
+    my $rsyncfound = 0;
+    my $inetdcontents = "";
+    
+    # get out of here if inetd.conf doesn't exist
+    return 1 if(!-e $file);
+    
+    open(IN,"<$file") or croak("Couldn't open $file for reading.");
+    while(<IN>) {
+        if(s/^rsync/\#rsync/) {
+            $rsyncfound = 1;
+        }
+        $inetdcontents .= $_;
+    }
+    close(IN);
+    
+    return 1 unless($rsyncfound);
+    
+    #
+    # Backup original inetd.conf file -BEF-
+    #
+    move($file,"$file.bak.$$") or die("Couldn't move $file to $file.bak.$$");
+
+    # 
+    # Write changes to inetd.conf without rsync entry. -BEF-
+    #
+    open(OUT,">$file") or croak("Couldn't open $file for writing.");
+    print OUT $inetdcontents;
+    close(OUT);
+
+    # 
+    # restart inetd without rsync enabled. -BEF-
+    #
+    print "Signaling inetd to restart...\n" unless($quiet);
+    killall('inetd',1); # sends SIGHUP to all inetd processes
+
+    #
+    # Put rsync entry back, so that we leave the system as we found it.
+    # Won't take effect though until system is rebooted, or inetd 
+    # restarted again. -BEF-
+    #
+    move("$file.bak.$$",$file) or die("Couldn't move $file.bak.$$ to $file");
+    return 1;
+}
+
+sub add_rsync_services {
+    my $file = "/etc/services";
+    open(IN,"<$file") or croak("Couldn't open $file for reading");
+   
+    my @services = <IN>;
+    close(IN);
+    return 1 if(grep(/^rsync/,@services));
+
+    backup_file("$file") or croak("Couldn't back up file $file.");
+    
+    open(OUT,">>$file") or croak("Couldn't open $file for appending");
+        print OUT qq(rsync           873/tcp                         # rsync\n);
+        print OUT qq(rsync           873/udp                         # rsync\n);
+    close(OUT);
+    return 1;
+} 
+
+sub backup_file {
+    my $file = shift;
+    my $newfile = $file . $backup_extension;
+    if(-e $newfile) {
+      print "Not backup up $file to $newfile\n"; 
+      print "  because $newfile already exists.\n";
+      return 1;
+    }
+    
+    if(!$quiet) {
+        print "Backing up $file to $newfile....\n";
+    }
+    return copy($file,$newfile);
+}
+
+sub create_rsyncd_conf {
+    my $file = shift;
+    open(OUT,">$file") or croak("Couldn't open file $file");
+    print OUT <<EOF;
+#
+# "Rsyphon"
+#
+#  This file: $rsyncd_conf_file
+#
+list = yes
+timeout = 900
+dont compress = *.gz *.tgz *.zip *.Z *.ZIP *.bz2 *.deb *.rpm *.dbf
+uid = root
+gid = root
+hosts allow = $hosts_allow
+log file = $rsyncd_log_file
+
+[root]
+    path = /
+    exclude = $rsyncd_conf_file $rsyncd_log_file
+
+EOF
+
+  close(OUT);
+}
+
+sub start_rsyncd {
+    # start up our fresh daemon
+    if (!$quiet) {
+        $Rsyphon::UseYourOwnKernel::verbose = 0;
+
+        # Give a couple of seconds for the old daemon to die.
+        print "Starting or re-starting rsync as a daemon";
+        $|++;
+        foreach (1..2) {
+             sleep 1;
+             print ".";
+        }
+    
+        # Start up the new one.
+        Rsyphon::UseYourOwnKernel::run_cmd("rsync --daemon --port=$RSYNC_PORT --config=$rsyncd_conf_file </dev/null", 0, 0);
+    
+        # Give a few seconds for the new daemon to start.
+        $|++;
+        foreach (3..5) {
+             sleep 1;
+             print ".";
+        }
+        print "\n";
+    
+        # Wrap up
+        print "done!\n";
+    } else {
+      # still need to sleep
+      sleep(2);
+      Rsyphon::UseYourOwnKernel::run_cmd("rsync --daemon --port=$RSYNC_PORT --config=$rsyncd_conf_file </dev/null", 0, 0);
+      sleep(3);
+    }
+}
+
+sub stop_rsyncd {
+    foreach my $i (0 .. 1) {
+        chomp(my $pid = `lsof -ti tcp:$RSYNC_PORT`);
+        unless ($pid) {
+            last;
+        }
+        if (!$i) {
+            # Send -HUP to the rsync daemon first.
+            kill(1, $pid);
+        } else {
+            # Force the kill of the rsync daemon.
+            kill(9, $pid);
+        }
+        sleep(3);
+    }
+    Rsyphon::UseYourOwnKernel::run_cmd("rm -f $rsyncd_conf_file $rsyncd_log_file", 0, 0);
+}
+
+sub wait_for_completion
+{
+    if ($norsyncd) {
+        return 0;
+    }
+
+    my $ret = 0;
+
+    # Look into the log file to catch the completed signal.
+    my $cmd = "tail -n 0 --follow=name $rsyncd_log_file";
+    local *LOG_FILE;
+    my $pid = open(LOG_FILE, "$cmd |");
+    if (!$pid) {
+        return 1;
+    }
+    while (my $line = <LOG_FILE>) {
+        if ($line =~ m/rsync error: received SIG/) {
+            # rsync daemon was stopped or killed by an external operation.
+            $ret = 1;
+            last;
+        } else {
+            chomp(my $err = (split(/\s+/, $line))[5]);
+            if ($err eq $Rsyphon::Common::rsync_magic_string) {
+                # correctly received the completed signal.
+                last;
+           }
+        }
+    }
+    kill(9, $pid);
+    close(LOG_FILE);
+
+    return $ret;
+}
+
+sub killall {
+    my ($pname,$signal) = @_;
+    my @list = split(/\s+/,`pidof $pname`);
+    if(scalar(@list)) {
+        kill $signal, @list;
+    }
+}
+
+
+sub devfs_transform {
+    my $devfsentry = shift;
+    my ($type, $host, $bus, $target, $lun, $part) = split(/\//,$devfsentry);
+    # get rid of the keywords in the sections
+    $bus =~ s/\D+//g;
+    $target =~ s/\D+//g;
+    $part =~ s/\D+//g;
+    my $realentry = "hd";
+    my $total = $bus * 2 + $target;
+
+    # now we add the real entry... remembering that chr(97) == 'a'
+    $realentry .= chr(97 + $total);
+    # add the partition number.  $part should always be blank, but
+    # it is here for completeness sake
+    $realentry .= $part;
+
+    return $realentry;
+}
+
+
+################################################################################
+#
+# Description:
+# Produce a list of IP addresses from a host name.
+#
+# Usage:
+# my @ips = get_ips($hostname);
+sub get_ips {
+
+        use Socket;
+        use Net::hostent;
+
+        my $host = $_[0];
+        
+        my ($hinfo, @ips);
+        if ( $hinfo = gethost($host) ) { 
+            foreach my $addr ( @{$hinfo->addr_list} ) {
+                push @ips, inet_ntoa($addr);
+            }
+        } else {
+            die "Can't find an IP address for $host!\n";
+        }
+        
+        return @ips;
+}
+
+
+### END functions
+
+
+# /* vi: set filetype=perl ai et ts=8: */

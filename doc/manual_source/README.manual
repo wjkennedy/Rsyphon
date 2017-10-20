@@ -1,0 +1,12 @@
+#
+# "Rsyphon" 
+#
+#  Copyright (C) 1999-2001 Brian Elliott Finley <brian.finley@baldguysoftware.com>
+#  Copyright (C) 2001 Dann Frazier <daniel_frazier@hp.com>
+#
+#  $Id$
+#
+
+To create the manual from the source
+-------------------------------------
+1) run "make <format>" where <format> can be html, ps, pdf, rtf, dvi, or all

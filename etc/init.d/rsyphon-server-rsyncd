@@ -1,0 +1,82 @@
+#! /bin/sh
+#
+#   Written 
+#       by Miquel van Smoorenburg <miquels@cistron.nl>.
+#   Modified for Debian GNU/Linux
+#       by Ian Murdock <imurdock@gnu.ai.mit.edu>.
+#   Hacked for rsync as used by Rsyphon
+#       by Brian Finley <brian@thefinleys.com>.
+#
+#
+# Support for IRIX style chkconfig:
+# chkconfig:   35 20 20
+# description: The rsync daemon used by Rsyphon.
+#
+#
+# Support for LSB compliant init system:
+### BEGIN INIT INFO
+# Provides: rsyphon-server-rsyncd
+# Required-Start: $network $syslog
+# Required-Stop:
+# Default-Start:  3 5
+# Default-Stop:   0 1 2 6
+# Short-Description: rsync daemon used by Rsyphon
+# Description: rsync daemon used by Rsyphon to serve up images, 
+#              autoinstall scripts, and other data used during the 
+#              installation and management of Rsyphon client 
+#              machines.
+### END INIT INFO
+
+
+export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+NAME=rsync
+OPTIONS="--daemon --config=/etc/rsyphon/rsyncd.conf"
+DAEMON=`which $NAME` || exit 0
+DESC="rsync daemon for rsyphon"
+
+test -f $DAEMON || exit 0
+
+case "$1" in
+  start)
+	echo -n "Starting $DESC: "
+	PID=`pgrep -f "$DAEMON $OPTIONS"`
+	[ ! -z "$PID" ] && echo "already running." && exit 0
+	$DAEMON $OPTIONS
+	PID=`pgrep -f "$DAEMON $OPTIONS"`
+	if ps -p $PID >/dev/null 2>&1; then
+		echo "ok."
+		exit 0
+	else
+		echo "failed."
+		exit 1
+	fi
+	;;
+  stop)
+	echo -n "Stopping $DESC: "
+	PID=`pgrep -f "$DAEMON $OPTIONS"`
+	[ ! -z "$PID" ] && kill $PID
+	if [ $? -eq 0 ]; then
+		echo "stopped."
+		exit 0
+	else
+		echo "failed."
+		exit 1
+	fi
+	;;
+  status)
+	echo -n "Status of rsync daemon for rsyphon: "
+	PID=`pgrep -f "$DAEMON $OPTIONS"`
+	[ ! -z "$PID" ] && echo "running." && exit 0
+	echo "not running." && exit 1
+	;;
+  restart|force-reload)
+	$0 stop
+	sleep 1
+	$0 start
+	;;
+  *)
+	echo "Usage: $0 {start|stop|status|restart|force-reload}" >&2
+	exit 1
+	;;
+esac
+

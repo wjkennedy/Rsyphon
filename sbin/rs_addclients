@@ -1,0 +1,483 @@
+#!/usr/bin/perl -w
+
+#
+#   "Rsyphon"
+#
+#   Copyright (C) 1999-2006  Brian Elliott Finley
+#   Copyright (C) 2007 Andrea Righi <a.righi@cineca.it>
+#
+#   $Id$
+#    vi:set filetype=perl:
+#
+
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use strict;
+use Getopt::Long;
+use Rsyphon::Config;
+use Rsyphon::HostRange;
+use vars qw($config $VERSION);
+
+### BEGIN Program ###
+# set version information
+my $VERSION = "SYSTEMIMAGER_VERSION_STRING";
+my $program_name = "rsaddclients";
+my $version_info = <<"EOF";
+$program_name (part of Rsyphon) v$VERSION
+
+Copyright (C) 1999-2006 Brian Elliott Finley <brian\@thefinleys.com>
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOF
+
+# set help information
+my $help_info = $version_info . <<"EOF";
+
+Usage: $program_name [OPTION]...
+   or: $program_name
+
+Options: (options can be presented in any order)
+
+ --help
+    Display this output.
+
+ --version
+    Display version and copyright information.
+
+ --hosts HOST_LIST
+    List of target nodes. List can be separated by
+    comma, spaces or new line and can include
+    ranges or host groups.
+
+    Example:  "node001-node099,node101 Login,Storage".
+
+ --ip-range IP_LIST
+    Range of IP addresses for clients.  Used to create an optional hosts
+    file that clients can use for IP address to hostname resolution
+    during install.  Not necessary if DNS reverse resolution is
+    configured for the IP addresses in question.  If both DNS and a
+    hosts file are used, information in the hosts file will supercede
+    the information in DNS.
+
+    Example: 10.0.0.1-10.0.0.99,10.0.0.101.
+
+ --domainname NAME
+    Domain name.
+
+ --script NAME
+    Master autoinstall script name.  Don't include the path or the
+    '.master' extension.
+
+    Example: my_image
+
+ --interactive YES/NO
+    This program will go interactive by default if domainname, host,
+    host-range, and script are all specified.
+
+    If you specify YES here, then it will go interactive, even if all of
+    these values are specified.
+
+    If you specify NO here, then it will not go interactive, even if it
+    is missing some of the required values.
+
+
+Download, report bugs, and make suggestions at:
+http://rsyphon.org/
+EOF
+
+# defaults
+my ($script, $hosts, $groups, $ip_range);
+
+my $domain_name = "";
+my $interactive = "";
+
+Getopt::Long::Configure("posix_default");
+Getopt::Long::Configure("no_gnu_compat");
+Getopt::Long::Configure("bundling");
+
+# interpret command line options
+GetOptions( 
+  "help"            => \my $help,
+  "version"         => \my $version,
+  "script=s"        => \$script,
+  "hosts=s"         => \$hosts,
+  "ip-range=s"      => \$ip_range,
+  "domainname=s"    => \$domain_name,
+  "interactive=s"   => \$interactive,
+) or die qq($help_info);
+
+# if requested, print help information
+if($help) {
+  print qq($help_info);
+  exit 0;
+}
+
+# if requested, print version and copyright information
+if($version) {
+  print qq($version_info);
+  exit 0;
+}
+
+unless($< == 0) { die "Must be run as root!\n"; }
+
+if($interactive) {
+    $interactive = lc $interactive;
+    unless( ($interactive eq "yes") or
+            ($interactive eq "no")
+        ) {
+        print qq(FATAL: If -interactive is used, it must be set to YES or NO.\n);
+        print qq(See "$program_name -help" for more information.\n);
+        exit 1;
+    }
+}
+
+if ($script) {
+    if($script =~ m|/|) {
+        print qq(FATAL: -script must not be a path or a file.\n);
+        print qq(See "$program_name -help" for more information.\n);
+        exit 1;
+    } elsif($script =~ m|\.master$|) {
+        print qq(FATAL: -script must not include the .master extension.\n);
+        print qq(See "$program_name -help" for more information.\n);
+        exit 1;
+    }
+}
+
+$domain_name = lc $domain_name;
+
+my $all_parameters_set = 0;
+if (defined($hosts) || defined($groups)) {
+    $all_parameters_set = 1;
+}
+
+unless ($all_parameters_set) {
+
+    if($interactive eq "no") {
+        print qq(FATAL: Not all required parameters were specified.  Exiting with status of 1.\n);
+        print qq(See "$program_name -help" for more information.\n);
+        exit 1;
+    } else {
+        $interactive = "yes";
+    }
+}
+
+
+my $autoinstall_script_dir = $config->autoinstall_script_dir();
+unless ($autoinstall_script_dir) {
+    die "FATAL: parameter AUTOINSTALL_SCRIPT_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+
+if($interactive eq "yes") {
+    system("clear");
+    print << "EOF";
+Welcome to the Rsyphon "rsaddclients" utility  
+--------------------------------------------------------------------------------
+
+This utility has 3 sections.  
+
+
+"Section 1" will ask you for your hostname information.
+
+
+"Section 2" will allow you to create softlinks from each client hostname to
+your "master" script in the "$autoinstall_script_dir" directory.  
+
+  Example: www297.sh -> web_server_image_v1.master
+
+
+"Section 3" will ask you for IP address information that will be combined 
+with the hostname information provided in Section 1 to create entries in 
+"/etc/hosts" for each of these same clients.  New entries will be appended 
+to the end of "/etc/hosts".  If you specify new hostnames for existing IP 
+addresses, those entries will be re-written in place to reflect the new 
+host names.
+
+
+EOF
+}
+
+if($interactive eq "yes") {
+    print "Continue? ([y]/n): ";
+    my $continue=<STDIN>;
+    chomp $continue;
+    $continue = lc $continue;
+    ($continue ne "n") or die "\nrsaddclients: No files were modified.\n";
+}
+
+my $satisfied;
+
+if($interactive eq "yes") {
+    ### BEGIN main questionnaire ###
+    $satisfied = "n";
+    while ($satisfied ne "y") {
+        system("clear");
+        print <<EOF;
+rsaddclients -- Section 1 (hostname information)
+--------------------------------------------------------------------------------
+
+The next series of questions will be used to create a range of hostnames.  
+You will be asked for your domain name, the base host name, a beginning 
+number, and an ending number.
+
+For example, if you answer:
+  domain name     = rsyphon.org
+  host range      = www7-www11,www20
+
+Then the result will be a series of hostnames that looks like this:
+  www7.rsyphon.org
+  www8.rsyphon.org
+  www9.rsyphon.org
+  www10.rsyphon.org
+  www11.rsyphon.org
+  www20.rsyphon.org
+
+
+EOF
+
+        print "What is your domain name? [$domain_name]: ";
+        $domain_name = get_response($domain_name);
+        $domain_name = lc $domain_name;
+
+        $hosts = '' unless(defined($hosts));
+        print "What is the hosts range that you want me to use? [$hosts]: ";
+        $hosts = get_response($hosts);
+
+        print "\n\n";
+        if ($hosts) {
+            print "I will work with hostnames:  $hosts\n"; 
+        } else {
+            next;
+        }
+        print "             in the domain:  $domain_name\n";
+        print "\nAre you satisfied? (y/[n]): ";
+        chomp($satisfied=<STDIN>);
+
+    } # while ($satisfied ne "y")
+    ### END main questionnaire ###
+
+
+    ### BEGIN links questionaire ###
+    system("clear");
+    print <<"EOF";
+rsaddclients -- Section 2 (soft links to master script)
+--------------------------------------------------------------------------------
+
+Would you like me to create soft links to a "master" script so that hosts:
+
+  $hosts
+
+EOF
+
+    print "can be autoinstalled with one of the available images? ([y]/n): ";
+    my $createlinks=<STDIN>;
+    chomp $createlinks;
+    $createlinks = lc $createlinks;
+
+    unless($createlinks eq "n") {
+        $satisfied="n";
+        while ($satisfied eq "n") {
+
+            # gather a list of available images
+            my (@files, $newest_script);
+            # ------------------------------------> sort by timestamp -- oldest to newest
+            my $cmd = "cd $autoinstall_script_dir && ls -1tr *.master 2>&1";
+            open(LS, "$cmd |");
+            while (<LS>) {
+                chomp;
+                s/\.master//;
+                push(@files, $_);
+                # make the newest image the default
+                $newest_script = $_;
+            }
+            close(LS);
+
+            unless($script) { $script = $newest_script; }
+
+            # display the list of available images
+            unless(@files) { die "There are no available autoinstall scripts.  Please use rsgetimage to retrieve an\nimage first.   -The Mgmt\n"; }
+            print qq(\nHere is a list of available autoinstall scripts:\n);
+            print "\n";
+            foreach(@files) {
+                print "$_ \n";
+            }
+            print "\n";
+
+            print "Which script would you like these hosts to be installed with?\n";
+            print "[$script]: ";
+            $script=get_response($script);
+            if ( -f "$autoinstall_script_dir/$script.master" ) {
+
+                create_links($hosts, $script, $autoinstall_script_dir);
+
+                print "\nYour soft links have been created.\n";
+                print "\nPress <Enter> to continue...";
+                $satisfied="y";
+                <STDIN>;
+                system("clear");
+
+            } else {
+
+                print qq(\nMaster script \"$script\" does not exist...\n);
+                print qq(Let's try again, shall we?\n);
+                print qq(\nPress <Enter> to continue...);
+                $satisfied="n";
+                <STDIN>;
+                system("clear");
+            }
+        }
+
+    } else {
+        print "\nNo links will be created.\n";
+        print "\nPress <Enter> to continue...";
+        <STDIN>;
+    }
+    ### END links questionaire ###
+
+
+    ### BEGIN hosts questionaire ###
+    system("clear");
+    print <<EOF;
+rsaddclients -- Section 3 (adding or modifying /etc/hosts entries)
+--------------------------------------------------------------------------------
+
+Your target machines need to be able to determine their host names from their
+IP addresses, unless their host name is specified in a local.cfg file.  
+
+The preferred method for doing this is with DNS.  If you have a working DNS 
+that has IP address to hostname resolution properly configured for your 
+target machines, then answer "n" here.
+
+If you don't have a working DNS, or you want to override the information in
+DNS, then answer "y" here to add entries to the "/etc/hosts" file on your
+image server.  After adding these entries, the /etc/hosts file will be 
+copied to "$autoinstall_script_dir" where it can be retrieved by your 
+target machines.
+
+I will ask you for your clients' IP addresses one subnet at a time.
+
+
+EOF
+
+    print "Would you like me to continue? (y/[n]): ";
+
+    my $etc_hosts=<STDIN>;
+    chomp $etc_hosts;
+    $etc_hosts = lc $etc_hosts;
+    if ($etc_hosts ne "y") { $etc_hosts = "n"; }
+
+    if ($etc_hosts eq "y") {
+
+        my @all_hosts;
+        if ($hosts) {
+            @all_hosts = Rsyphon::HostRange::expand_groups($hosts);
+        } else {
+            die "ERROR: something unexpected... groups or hosts were not defined!\n";
+        }
+
+        unless (defined($ip_range)) {
+            # Try to find the correct IP range.
+            my $starting_ip = Rsyphon::HostRange::hostname2ip($all_hosts[0]); 
+            my $ending_ip = Rsyphon::HostRange::hostname2ip($all_hosts[$#all_hosts]); 
+            if ($starting_ip and $ending_ip) {
+                # Try with a simple list of contiguous elements... -AR-
+                $ip_range = "$starting_ip-$ending_ip";
+            } else {
+                # IP range unknown.
+                $ip_range = '';
+            }
+        }
+
+        ### get IP information ###
+        # ne "y" is used instead of eq "n" because the dissatisfied response may be something other than "n".
+        $satisfied="n";
+        while (1) {
+            while ($satisfied ne "y") {
+                system("clear");
+                print "rsaddclients -- Section 3 (adding or modifying /etc/hosts entries -- continued...)\n";
+                print "--------------------------------------------------------------------------------\n";
+                print "\nHostnames range is: $hosts\n";
+                print "\nWhat is the IPs address range (e.g. 10.0.0.1-10.0.0.100,10.0.0.101)?\n";
+                print "[$ip_range]: ";
+                $ip_range = get_response($ip_range);
+                print "I will work with IP addresses:  $ip_range\n";
+                print "                and hostnames:  $hosts\n";
+                print "\nAre you satisfied? (y/[n]): ";
+                chomp($satisfied=<STDIN>);
+            }
+            ### get IP information ###
+
+            if (!Rsyphon::HostRange::add_hosts_entries($ip_range, $domain_name, @all_hosts)) {
+                my $cmd = "cp -f /etc/hosts $autoinstall_script_dir";
+                !system($cmd) or die "Couldn't $cmd!";
+                last;
+            } else {
+                $satisfied = 'n';
+                print "\nPress <Enter> to continue...";
+                <STDIN>;
+            }
+        }
+
+        if ( $etc_hosts eq "y" ) {
+            print "\nThese entries have been added to /etc/hosts, and /etc/hosts has been copied\n";
+            print "to $autoinstall_script_dir for use by your auto-install clients.\n";
+        }
+        print "\nPress <Enter> to continue...";
+        <STDIN>;
+
+    } else {
+
+        print "\nNo entries will be added to your /etc/hosts file.\n";
+
+    }
+    ### END hosts questionaire ###
+
+} else {
+    unless (defined($hosts)) {
+        die "ERROR: something unexpected... groups or hosts were not defined!\n";
+    }
+    my $done = 0;
+    if (defined($ip_range)) {
+        my @all_hosts = Rsyphon::HostRange::expand_groups($hosts);
+        if (Rsyphon::HostRange::add_hosts_entries($ip_range, $domain_name, @all_hosts)) {
+            die("$program_name: aborted!\n");
+        }
+        my $cmd = "cp -f /etc/hosts $autoinstall_script_dir";
+        !system($cmd) or die "Couldn't $cmd!";
+
+        print "$program_name: hosts defined in /etc/hosts\n";
+        $done = 1;
+    }
+    if (defined($script)) {
+        create_links($hosts, $script, $autoinstall_script_dir);
+        print "$program_name: created links in $autoinstall_script_dir\n";
+        $done = 1;
+    }
+    if (!$done) {
+        print "WARNING: no changes have been made!\n";
+    }
+}
+
+print "\n$program_name: successfully completed.\n";
+exit(0);
+
+### BEGIN Subroutines ###
+sub get_response {
+    my $garbage_out=$_[0];
+    my $garbage_in=<STDIN>;
+    chomp $garbage_in;
+    unless ($garbage_in eq "") { $garbage_out = $garbage_in; }
+    return $garbage_out;
+}
+
+
+# Usage: create_links($hostlist, $script, $autoinstall_script_dir);
+sub create_links {
+
+    my ($hostlist, $script, $autoinstall_script_dir) = @_;
+
+    foreach my $node (Rsyphon::HostRange::expand_range_list($hostlist)) {
+        my $cmd = "cd $autoinstall_script_dir && ln -sf $script.master $node.sh";
+        !system($cmd) or die "Can't $cmd!";
+    }
+}
+
+### END Subroutines ###

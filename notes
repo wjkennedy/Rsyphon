@@ -1,0 +1,1 @@
+kernel/bounds.c:1:0: error: code model kernel does not support PIC mode

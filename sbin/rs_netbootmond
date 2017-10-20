@@ -1,0 +1,218 @@
+#!/usr/bin/perl -w
+#
+# "Rsyphon"
+#
+#  Copyright (C) 2002 Bald Guy Software, Brian E. Finley <brian@thefinleys.com>
+#  Copyright (C) 2003-2014 Brian E. Finley <brian@thefinleys.com>
+#
+#    2005.07.12 Brian Elliott Finley
+#    - apply umask patch for Daniel Widyono
+#
+
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use strict;
+use File::Copy;
+use POSIX qw(setsid);
+use Rsyphon::Config;
+use Rsyphon::HostRange;
+use Rsyphon::Server;
+use vars qw($config $VERSION);
+
+$0 = "rsnetbootmond";
+
+my $net_boot_default = lc $config->net_boot_default();
+if("$net_boot_default" eq "net") {
+    print STDERR qq(\nNET_BOOT_DEFAULT set to "$net_boot_default" in /etc/rsyphon/rsyphon.conf.\n);
+    print STDERR qq(No need for me here, so I'm exiting. See rsnetbootmond\(8\) for details.\n);
+    exit 0;
+}
+
+my $tftp_dir = $config->tftp_dir();
+my $pxe_conf_dir;
+my $kboot_conf_dir;
+
+unless($tftp_dir) {
+    die "FATAL: parameter TFTP_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+} else {
+    $pxe_conf_dir = "$tftp_dir" . "/pxelinux.cfg";
+    $kboot_conf_dir = "$tftp_dir" . "/kboot.cfg";
+}
+
+my $syslinux_cfg_localboot = "/etc/rsyphon/pxelinux.cfg/syslinux.cfg.localboot";
+my $kboot_cfg_localboot = "/etc/rsyphon/kboot.cfg/localboot";
+my $pid_file = "/var/run/rsnetbootmond.pid";
+my $log_file = "/var/log/rsyphon/rsyncd";
+
+
+################################################################################
+#
+# Misc. Daemon stuff
+#
+################################################################################
+chdir '/'                   or die "Can't chdir to /: $!";
+open STDIN, '/dev/null'     or die "Can't read /dev/null: $!";
+open STDOUT, '>>/dev/null'  or die "Can't write to /dev/null: $!";
+open STDERR, '>>/dev/null'  or die "Can't write to /dev/null: $!";
+umask 0;
+sub REAPER {
+    $SIG{CHLD} = \&REAPER;
+    my $waitedpid = wait;
+    print STDERR "Dead child: $waitedpid\n";
+}
+$SIG{CHLD} = \&REAPER;
+
+
+################################################################################
+#
+# Fork the watching process
+#
+################################################################################
+my $pid;
+if ($pid = fork) {
+} elsif (defined $pid) { # send the forked child off
+
+    setsid or die "Can't start a new session: $!";
+
+    my $file = $pid_file;
+    local *FILE;
+    open(FILE,">$file") or die ("FATAL: Can't open file: $file\n");
+        print FILE "$$\n";
+    close(FILE);
+
+    # Lurk
+    tail_rsync_log_file();
+
+} else {
+        die "Can't fork: $!\n";
+}
+
+
+################################################################################
+#
+# BEGIN subroutines 
+#
+sub tail_rsync_log_file {
+
+    my $pid;
+
+    $SIG{TERM} = sub {
+        if (defined($pid)) {
+            kill(1, $pid);
+        }
+    };
+
+    my $cmd = "tail -n 0 --follow=name $log_file";
+    local *LOG_FILE;
+    $pid = open(LOG_FILE,"$cmd |") || die("Can't $cmd!");
+        while(<LOG_FILE>) {
+       
+            # Get individual field values for this line
+            my @array = split(/\s+/);
+
+            if ($array[5] =~ /scripts\/imaging_complete_?([\.0-9]+)?/) {
+
+                my $client_ip;
+
+                if (defined($1)) {
+                    $client_ip = $1;
+                } else {
+                    $client_ip = $array[8];
+                    $client_ip =~ s/\(//g;
+                    $client_ip =~ s/\)//g;
+                }
+
+                # diagnostic output
+                #print "Configuring $client_ip for local booting.\n";
+                create_no_boot_symlink($client_ip);
+            }
+        }
+    close(LOG_FILE);
+    exit 0;
+}
+
+
+# Usage: create_no_boot_symlink($client_ip);
+sub create_no_boot_symlink {
+
+    my ($client_ip) = @_;
+
+    my $ip_hex = Rsyphon::HostRange::ip2hex($client_ip);
+    my $conf_dir;
+    my $localboot_file;
+
+    if (-d $kboot_conf_dir) {
+        $conf_dir = $kboot_conf_dir;
+        $localboot_file = $kboot_cfg_localboot;
+    } else {
+        $conf_dir = $pxe_conf_dir;
+        $localboot_file = $syslinux_cfg_localboot;
+    }
+
+    # Diagnostic output
+    #print "ip_hex: $ip_hex\n";
+
+    unlink("$conf_dir/$ip_hex");
+    umask(0022);
+    copy("$localboot_file", "$conf_dir/$ip_hex");
+    
+}
+#
+# END subroutines
+#
+################################################################################
+
+__END__
+
+=head1 NAME
+
+rsnetbootmond - Rsyphon's daemon for controlling netboot clients.
+
+=head1 SYNOPSIS
+
+/etc/init.d/rsyphon-server-netbootmond start|stop|status|restart
+
+=head1 DESCRIPTION
+
+=over 8
+
+If clients are configured to always boot from the network, B<rsnetbootmond> can
+be configured to tell them to boot off their local disks each time they boot
+after having completed a successful autoinstall.
+
+This allows to always set network booting as default from the BIOS of the
+clients and boot from local disk after a successfull auto-installation.
+
+To enable this feature the parameter B<NET_BOOT_DEFAULT> must be set to B<local>
+in B</etc/rsyphon/rsyphon.conf> and rsnetbootmond must be started via
+the init script B</etc/init.d/rsyphon-server-netbootmond>.
+
+To disable this feature set B<NET_BOOT_DEFAULT> to B<net> in
+B</etc/rsyphon/rsyphon.conf> or just stop B<rsnetbootmond> via the
+init script B</etc/init.d/rsyphon-server-netbootmond>.
+
+=back
+
+=head1 SEE ALSO
+
+rsyphon(8), rsmkclientnetboot(8), /etc/init.d/rsyphon-server-netbootmond
+
+=head1 AUTHOR
+
+Brian E. Finley <brian@thefinleys.com>.
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2002-2014 by Brian E. Finley <brian@thefinleys.com>.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut
+

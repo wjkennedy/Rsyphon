@@ -1,0 +1,9 @@
+#!/bin/sh
+if [ -e /tftpboot/kernel -o -e /tftpboot/initrd.img ]; then
+	echo
+	echo "WARNING: default tftpboot directory has been moved to /var/lib/tftpboot!"
+        echo "If you don't like it, change /etc/rsyphon/rsyphon.conf"
+	echo
+fi
+
+#DEBHELPER#

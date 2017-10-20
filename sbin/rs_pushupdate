@@ -1,0 +1,323 @@
+#!/usr/bin/perl -w
+#
+#  "Rsyphon"
+#
+#  Copyright (C) 2008 Andrea Righi <a.righi@cineca.it>
+
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use strict;
+use Getopt::Long;
+use Sys::Hostname;
+use Rsyphon::HostRange;
+
+my $VERSION = "SYSTEMIMAGER_VERSION_STRING";
+
+my $program_name = "rspushupdate";
+
+my $version_info = << "EOF";
+$program_name (part of Rsyphon) v$VERSION
+
+Copyright (C) 2008 Andrea Righi <a.righi\@cineca.it>
+
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOF
+
+my $help_info = $version_info . <<"EOF";
+
+Usage: $program_name --hosts host_range [OPTION]...
+
+Options: (options can be presented in any order and can be abbreviated)
+ --help, -h             Display this output.
+
+ --version, -v          Display version and copyright information.
+
+ --max, -m=NUM          Set the maximum number of concurrent sessions
+                        to NUM (default=32).
+
+ --hosts, -n=HOST_LIST  List of target nodes. List can be separated by
+                        comma, spaces or new line and can include
+                        ranges or host groups
+                        (e.g. "node001-node256 node300,Login,Storage").
+                        Host groups must be defined by rsclusterconfig(8).
+
+ --hosts-file, -f=FILE  File that contains the list of the target host.
+                        Every line can include one or more ranges or
+                        host groups
+                        (e.g. "node001-node256 node300,Login,Storage").
+                        Host groups must be defined by rsclusterconfig(8).
+
+ --timeout, -t=NUM      Set the timeout of the ssh sessions (default=15s).
+
+ --ssh-user, -l=USER    Run the command as user USER.
+
+ --image, -i=IMAGE	Image from which the client should be updated (if not
+			specified use the rsclusterconfig(8) settings).
+
+ --override, -o=OVERRIDES
+			Override module(s) from which to copy additional files
+			(if not specified use the rsclusterconfig(8) settings).
+
+ --server, -s=HOST	Hostname or IP address of the imageserver (if not
+			specified use the image server's hostname).
+
+ --directory DIR, -D=DIR
+			Absolute path of the directory to be updated (if not
+			specified use "/").
+
+ --no-bootloader, -b	Don't  run  the bootloader (lilo, elilo, grub, etc)
+			after update completes.
+
+ --autoinstall, -a	Autoinstall this client the next time it reboots.
+
+ --flavor , -F=FLAVOR	The boot flavor to be used for doing an autoinstall
+			(only valid with -autoinstall).
+
+ --configure-from, -c=DEVICE
+			Stores the network configuration for DEVICE in the
+			/local.cfg file so that the same settings will be used
+			during the autoinstall process (only valid with
+			-autoinstall).
+
+ --reboot, -r		Reboot client after update completes.
+
+ --dry-run, -d		Don't actually modify anything, just show what would be
+			done.
+
+EOF
+
+Getopt::Long::Configure("posix_default");
+Getopt::Long::Configure("no_gnu_compat");
+Getopt::Long::Configure("bundling");
+
+GetOptions(
+	"help|h"		=> \my $help,
+	"version|v"		=> \my $version,
+	"max|m=i"		=> \my $concurrents,
+	"hosts|n=s"		=> \my $hostlist,
+	"hosts-file|f=s"	=> \my $hostlist_file,
+	"timeout|t=i"		=> \my $timeout,
+	"ssh-user|l=s"		=> \my $ssh_user,
+	"image|i=s"		=> \my $image,
+	"override|o=s"		=> \my $override,
+	"server|s=s"		=> \my $server,
+	"directory|D=s"		=> \my $directory,
+	"no-bootloader|b"	=> \my $no_bootloader,
+	"autoinstall|a"		=> \my $autoinstall,
+	"flavor|F=s"		=> \my $flavor,
+	"configure-from|c=s"	=> \my $configure_from,
+	"reboot|r"		=> \my $reboot,
+	"dry-run|d"		=> \my $dry_run,
+) or die("$help_info");
+
+### BEGIN evaluate commad line options ###
+
+if ($help) {
+	print "$help_info";
+	exit(0);
+}
+
+if ($version) {
+	print "$version_info";
+	exit(0);
+}
+
+# Evaluate target hosts.
+my @hosts = ();
+if ($hostlist_file) {
+	# Read input file.
+	open(IN, '<', $hostlist_file) ||
+		die("error: could't read $hostlist_file!\n");
+	$hostlist .= ' ' . join(' ', <IN>);
+	close(IN);
+}
+if ($hostlist) {
+	# Expand host groups and host ranges.
+	@hosts = Rsyphon::HostRange::expand_groups($hostlist);
+}
+unless (@hosts) {
+	die("error: no host defined!\nTry \"--help\" for more options.\n");
+}
+
+unless ($timeout) {
+	$timeout = 15;
+}
+
+unless ($ssh_user) {
+	$ssh_user = $ENV{'USER'};
+}
+
+if ($concurrents) {
+	$Rsyphon::HostRange::concurrents = $concurrents;
+}
+
+# Use the following ssh options.
+my $ssh_opts = "-x -o BatchMode=yes -o ConnectTimeout=$timeout -l $ssh_user";
+
+### END evaluate command line options ###
+
+### BEGIN build rsupdateclient command line ###
+my $updateclient_opts = "--yes";
+if ($image) {
+	$updateclient_opts .= " --image $image";
+}
+if ($override) {
+	$updateclient_opts .= " --override $override";
+}
+if ($server) {
+	$updateclient_opts .= " --server $server";
+} else {
+	$updateclient_opts .= ' --server ' . hostname();
+}
+if ($directory) {
+	$updateclient_opts .= " --directory $directory";
+}
+if ($no_bootloader) {
+	$updateclient_opts .= " --no-bootloader";
+}
+if ($autoinstall) {
+	$updateclient_opts .= " --autoinstall";
+}
+if ($flavor) {
+	$updateclient_opts .= " --flavor $flavor";
+}
+if ($configure_from) {
+	$updateclient_opts .= " --configure-from $configure_from";
+}
+if ($reboot) {
+	$updateclient_opts .= " --reboot";
+}
+if ($dry_run) {
+	$updateclient_opts .= " --dry-run";
+}
+### END build rsupdateclient command line ###
+
+# Run rsupdateclient on the target clients.
+Rsyphon::HostRange::thread_pool_spawn('ssh', $ssh_opts,
+			"\"rsupdateclient $updateclient_opts\"",
+			@hosts);
+
+__END__
+
+=head1 NAME
+
+rspushupdate - update the image of one or more remote clients
+
+=head1 SYNOPSIS
+
+rspushupdate --hosts host_range [OPTION]...
+
+=head1 DESCRIPTION
+
+B<rspushupdate> is a tool for updating the image on one or more client nodes.
+It relies on the availability of ssh as a transport layer for communicating
+with client nodes.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--help | -h>
+
+Display a short help.
+
+=item B<--version | -V>
+
+Display version and copyright information.
+
+=item B<--max | -m NUM>
+
+Set the maximum number of concurrent sessions to NUM (default=32).
+
+=item B<--hosts | -n HOST_LIST>
+
+List of target nodes. List can be separated by comma, spaces or new line and can
+include ranges or host groups (e.g. "node001-node256 node300,Login,Storage").
+Host groups must be defined by rsclusterconfig(8).
+
+=item B<--hosts-file | -f FILE>
+
+File that contains the list of the target hosts. Every line can include one or
+more ranges or host groups (e.g. "node001-node256 node300,Login,Storage").
+Host groups must be defined in rsclusterconfig(8).
+
+=item B<--timeout | -t NUM>
+
+Set the timeout of the ssh sessions (default=15s).
+
+=item B<--ssh-user | -l USER>
+
+Run the command as user USER.
+
+=item B<--image | -i IMAGE>
+
+Image from which the client should be updated (if not specified use the
+rsclusterconfig(8) settings).
+
+=item B<--override | -o OVERRIDES>
+
+Override module(s) from which to copy additional files (if not specified use
+the rsclusterconfig(8) settings).
+
+=item B<--server | -s HOST>
+
+Hostname or IP address of the imageserver (if not specified use the image
+server's hostname).
+
+=item B<--directory | -D HOST>
+
+Absolute path of the directory to be updated (if not specified use "/").
+
+=item B<--no-bootloader | -b>
+
+Don't  run  the bootloader (lilo, elilo, grub, etc) after update completes.
+
+=item B<--autoinstall | -a>
+
+Autoinstall this client the next time it reboots.
+
+=item B<--flavor | -F FLAVOR>
+
+The boot flavor to be used for doing an autoinstall (only valid with
+-autoinstall).
+
+=item B<--configure-from | -c DEVICE>
+
+Stores the network configuration for DEVICE in the /local.cfg file so that the
+same settings will be used during the autoinstall process (only valid with
+-autoinstall)
+
+=item B<--reboot | -r>
+
+Reboot client after update completes.
+
+=item B<--dry-run | -d>
+
+
+Don't actually modify anything, just show what would be done.
+
+=back
+
+=head1 SEE ALSO
+
+rsyphon(8), rspsh(8), rspcp(8), rspushinstall(8), rsclusterconfig(8)
+
+=head1 AUTHOR
+
+Andrea Righi <a.righi@cineca.it>.
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2008 by Andrea Righi <a.righi@cineca.it>.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

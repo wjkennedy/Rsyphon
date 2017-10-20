@@ -1,0 +1,19 @@
+#
+# "Rsyphon"
+#
+#    -2001    
+#        
+#
+#  $Id$
+#
+
+***GOTCHA!***
+
+DO NOT TOUCH THDIRTORI UNLS YOU KNOW ACTLY WHAT YOU ARDOING!!!
+
+You have the ability to totally hose an entire network of computers if you put
+the wrong file in the right place.  OR  MS UP THPMISSIONS ON A FIL
+
+Permissions, ownership, modes, sticky-bits, etc. are all very important as they
+will be replicated *exactly* on the clients!!!
+

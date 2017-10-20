@@ -1,0 +1,379 @@
+<chapter id="installation">
+  <title>Installing Rsyphon</title>
+  <section>
+    <title>How Does it Work?</title>
+    <para>
+      <application>Rsyphon</application> uses a centralized server, called
+      <emphasis>image server</emphasis> that retrieves a golden client's entire
+      system image and deploys it to any number of different client systems.
+      A golden client is a system you have customized to work exactly the way
+      you want.  You can re-compile the kernel, install custom software, and
+      do any configuration file tweaking you like.
+      The <command>rsgetimage(8)</command> command pulls the golden image to
+      the image server for deployment to other systems.
+    </para>
+    <para>
+      Once you have deployed the initial image to your client systems,
+      you can update/upgrade the client systems by syncing them to an updated
+      image on the image server.  Only the modified parts of files are 
+      pulled to the client for a fast, efficient, and accurate
+      mass update/upgrade.
+    </para>
+    <note>
+      <para>
+	Tools other than Rsyphon are available for doing automatic
+	installations, such as Red Hat's <application>Kickstart</application>, 
+	which installs systems based on a list of pre-defined
+	packages or <application>debootstrap</application>, used to create
+	a Debian base system from scratch. However, such
+	package-based installs can be very limiting because they don't
+	have an automated way to deal with non-packaged files.  If you
+	re-compile your kernel, add a piece of non-packaged software, or
+	modify certain configuration files, package-based installation
+	methods usually require you to do some sort of scripting or
+	programming to deal with these "special cases."
+      </para>
+    </note>
+  </section>
+  <section>
+    <title>Obtaining Rsyphon</title>
+    <para>
+      Rsyphon is currently packaged in RPM and DEB format.
+      Official packages can be downloaded from
+      <ulink url="http://www.rsyphon.org">http://www.rsyphon.org/</ulink>.
+    </para>
+  </section>
+  <section>
+    <title>Selecting A Machine To Use As An Image Server</title>
+    <para>
+      Because Rsyphon uses other network services such as DHCP, an existing
+      server that provides these services often makes a good
+      choice for an image server.  In addition, the image server you choose 
+      needs to have enough disk space to hold the images you want to deploy.  
+      Rsyphon stores images as an uncompressed directory structure, so a 
+      quick analysis of the disk usage on your golden client will give you a 
+      good estimate of the space required on the image server.  If you plan to do 
+      multiple simultaneous image updates, poor processor performance on your image
+      server can cause a bottleneck.
+    </para>
+    <para>
+      An alternative scalable and reliable method to break the bandwidth and
+      performance limits of the image server is the BitTorrent transport.
+      With BitTorrent the upload bandwidth of the clients can be used to
+      distribute the images among the nodes exploiting the advantages of
+      the peer-to-peer networks. For more informations see
+      <ulink url="http://wiki.rsyphon.org/index.php/BitTorrent">
+          http://wiki.rsyphon.org/index.php/BitTorrent
+      </ulink>.
+    </para>
+  </section>
+  <section>
+    <title>Installing an Image Server</title>
+    <para>
+      The official packages of Rsyphon are distributed in the file release
+      system on SourceForge.net at this link:
+      <ulink url="https://sourceforge.net/project/platformdownload.php?group_id=259">
+          https://sourceforge.net/project/platformdownload.php?group_id=259
+      </ulink>).
+    </para>
+
+    <para>
+      Rsyphon depends on the System Configurator package that is also
+      available on SourceForge:
+      <ulink url="https://sourceforge.net/project/showfiles.php?group_id=24006">
+          https://sourceforge.net/project/showfiles.php?group_id=24006  
+      </ulink>).
+    </para>
+
+    <para>
+      A quick way to download all the required packages is to run the
+      sis-install script (replacing i386 with the architecture of your clients):
+    </para>
+
+    <para>
+      <programlisting>
+        $ mkdir rsyphon
+        $ cd rsyphon
+        $ wget http://download.rsyphon.org/pub/sis-install/install
+        $ chmod u+x install
+        $ ./install -v --download-only --tag stable --directory . \ 
+        > systemconfigurator \
+        > rsyphon-client rsyphon-common \
+        > rsyphon-i386boot-standard rsyphon-i386initrd_template \
+        > rsyphon-server \
+        > rsyphon-bittorrent rsyphon-flamethrower
+      </programlisting>
+    </para>
+
+    <para>
+      Use <computeroutput>./install --help</computeroutput> for more informations.
+    </para>
+    
+    <para>
+      Install all the base packages in the image server.
+      In RPM-based distributions run:
+      <programlisting>
+      # rpm -ivh systemconfigurator-*.rpm \
+      > rsyphon-common-*.rpm rsyphon-server-*.rpm \
+      > rsyphon-*initrd_template-*.rpm rsyphon-*boot-standard-*.rpm
+      </programlisting>
+      In Debian or Debian-like distributions run:
+      <programlisting>
+      # dpkg -i systemconfigurator-*.deb \
+      > rsyphon-common-*.deb rsyphon-server-*.deb \
+      > rsyphon-initrd_template-*.deb rsyphon-boot-*-standard-*.deb \
+      </programlisting>
+    </para>
+
+    <para>
+      If you want to use the <emphasis>BitTorrent</emphasis> transport install
+      also the rsyphon-bittorrent package.
+      RPM package:
+      <programlisting>
+      # rpm -i rsyphon-bittorrent-*.rpm
+      </programlisting>
+      DEB package:
+      <programlisting>
+      # dpkg -i rsyphon-bittorrent-*.deb
+      </programlisting>
+    </para>
+
+    <para>
+      If you want to use the <emphasis>Multicast</emphasis> transport install
+      also the rsyphon-flamethrower package.
+      RPM package:
+      <programlisting>
+      # rpm -i rsyphon-flamethrower-*.rpm
+      </programlisting>
+      DEB package:
+      <programlisting>
+      # dpkg -i rsyphon-flamethrower-*.deb
+      </programlisting>
+      This package requires udpcast
+      (<ulink url="http://udpcast.linux.lu/source.html">http://udpcast.linux.lu/source.html</ulink>)
+      and Flamethrower
+      (<ulink url="http://freshmeat.net/projects/flamethrower">http://freshmeat.net/projects/flamethrower</ulink>),
+      usually included in the common distributions.
+    </para>
+    
+    <para>
+      If your clients have multiple architectures download also the appropriate
+      rsyphon-<computeroutput>ARCH</computeroutput>boot-standard and
+      rsyphon-<computeroutput>ARCH</computeroutput>initrd_template in your
+      image server.
+    </para>
+
+    <para>
+      The boot packages support multiple configurations.  Because different
+      client configurations require different drivers, kernel versions, etc.,
+      Rsyphon allows you to install different boot packages, which
+      are known as "boot flavors."
+    </para>
+
+    <para>
+      Each Rsyphon release provides the "standard" flavors for each
+      supported	architecture. For example, the 3.9.6 release should have these 
+      packages:
+      <itemizedlist>
+	  <listitem><para>rsyphon-boot-i386-standard_3.9.6-1_all.deb,</para></listitem>
+  	  <listitem><para>rsyphon-boot-x86_64-standard_3.9.6-1_all.deb,</para></listitem>
+  	  <listitem><para>rsyphon-boot-ppc64-ps3-standard_3.9.6-1_all.deb,</para></listitem>
+  	  <listitem><para>...</para></listitem>
+      </itemizedlist>
+    </para>
+    <para>
+      Rsyphon and its standard boot flavors support most common hardware
+      configurations.
+      The <filename>.config</filename> files list the options for this kernel.
+    </para>
+
+    <para>
+      You can use other flavors at any time to support alternate
+      client configurations, and multiple boot flavors can be installed
+      simultaneously.
+    </para>
+
+    <para>
+      To create a custom flavor perfectly compatible with the distribution you
+      can exploit the UYOK (Use Your Own Kernel) feature.
+      Standard flavors use a general purpose kernel that supports a lot of
+      hardware components, but obviously they can't be able to support all
+      the possible devices that could be present in a totally generic client
+      (see also hardware with proprietary drivers).
+      For this reason starting from 3.6.x the UYOK (UseYourOwnKernel) feature
+      has been introduced.
+      This feature allows you to use the same kernel that runs in your golden
+      client to perform the installation in other clients. In this way it's
+      possible to theoretically support all the hardware/components you could
+      have. Simply if the kernel of your distribution is working well with your
+      clients, it works well too to install them.
+      For more informations see 
+      <ulink url="http://wiki.rsyphon.org/index.php/UYOK">http://wiki.rsyphon.org/index.php/UYOK</ulink>.
+    </para>
+  </section>
+
+  <section>
+    <title>Selecting A Machine To Use As A Golden Client</title>
+    <para>
+      A golden client is a system manually installed and customized of which
+      you want to make an image (clone).
+    </para>
+  </section>
+
+  <section>
+    <title>Creating an Image on the Golden Client</title>
+    <para>
+      To create an image for deployment with the Rsyphon tool, install
+      and configure a Linux distribution and any additional software that you
+      want the image to contain on a system you will use as your golden
+      client. You will deploy the image of that system (or golden client)
+      onto other machines.
+    </para>
+  </section>
+
+  <section>
+    <title>Installing Rsyphon Client Software on a Golden Client</title>
+    <para>
+      To create a golden client, you must install the rsyphon-client
+      package on it.
+    </para>
+    <procedure>
+      <step>
+        <para>
+          Download and install the rsyphon-client package.
+        </para>
+        <para>
+          <programlisting>
+          $ mkdir rsyphon
+          $ cd rsyphon
+          $ wget http://download.rsyphon.org/pub/sis-install/install
+          $ chmod u+x install
+          $ ./install -v --download-only --tag stable --directory . \ 
+          > systemconfigurator \
+          > rsyphon-client rsyphon-common \
+          > rsyphon-i386initrd_template
+          </programlisting>
+        </para>
+
+        <para>
+          Use <computeroutput>./install --help</computeroutput> for more informations.
+        </para>
+    
+        <para>
+          Install all the base packages in the image server.
+          In RPM-based distributions run:
+          <programlisting>
+          # rpm -ivh systemconfigurator-*.rpm \
+          > rsyphon-common-*.rpm rsyphon-client-*.rpm \
+          > rsyphon-*initrd_template-*.rpm
+          </programlisting>
+          In Debian or Debian-like distributions run:
+          <programlisting>
+          # dpkg -i systemconfigurator-*.deb \
+          > rsyphon-common-*.deb rsyphon-client-*.deb \
+          > rsyphon-initrd_template-*.deb
+          </programlisting>
+        </para>
+      </step>
+    </procedure>
+  </section>
+
+  <section>
+    <title>Creating an Image from scratch</title>
+    <para>
+      An alternative approach to create images is to install all the needed
+      packages into a directory. 
+    </para>
+    <para>
+      <application>System Installer</application>, a component of the System 
+      Installation Suite to which Rsyphon belongs, allows you to install 
+      Linux directly to an image, bypassing the golden client step.
+      <application>System Installer</application> 
+      packages and documentation can be found at
+      <ulink url="http://systeminstaller.sourceforge.net">http://systeminstaller.sourceforge.net</ulink>
+      Images created with SystemInstaller are interchangeable with those
+      created using the Rsyphon tools.
+    </para>
+    <para>
+      You can even create an image using one of the common tools shipped with
+      your distribution, instead of using SystemInstaller.
+      The tool must be able to install a distribution into a directory (ex.
+      Debootstrap for Debian, kickstart or yum for Red Hat, YaST for SuSE, etc.) 
+    </para>
+  </section>
+
+  <section>
+    <title>Upgrading Rsyphon</title>
+    <para>
+      Although Rsyphon upgrades are automated in most ways, you must
+      perform some upgrade processes manually to prevent losing user
+      customizations.
+    </para>
+    <section>
+      <title>Regenerating autoinstallscripts</title>
+      <para>
+        With each release of Rsyphon, use the <command>rsmkautoinstallscript</command> 
+	command to update the autoinstall scripts stored in 
+	<filename>/var/lib/rsyphon/scripts</filename>.  Installations using 
+	older scripts may fail.
+      </para>
+      <warning>
+        <para>
+          <command>rsmkautoinstallscript</command> overwrites the 
+          pre-existing script for an image.  If you make any changes to 
+          your autoinstall scripts (also known as .master scripts),
+          backup those scripts to forward port your changes to the new
+          release.
+        </para>
+      </warning>
+      <example>
+        <title>Generating new autoinstallscripts</title>
+        <para>
+        <programlisting>
+          # rsmkautoinstallscript -image myimage -post-install reboot -ip-assignment dhcp
+        </programlisting>
+        </para>
+        <para>
+          If you require customizations to your autoinstallscript, edit the 
+          appropriate .master file in <filename>/var/lib/rsyphon/scripts/</filename>.
+        </para>
+      </example>
+    </section>
+    <section>
+      <title>Migrating Customizations of the /etc/rsyphon/rsyncd.conf file to
+	Rsyphon 3.0.0</title>
+      <para>
+        Prior to the release of Rsyphon 3.0.0, your changes to 
+        <filename>/etc/rsyphon/rsyncd.conf</filename> could
+        be made within the file, but were susceptible to upgrade issues.  With version
+        3.0.0, you can make these changes in a separate file that is maintained
+        across upgrades.  See the rsmkrsyncd_conf(8) man page for details.
+      </para>
+    </section>
+    <section>
+      <title>Regenerating boot media</title>
+      <para>
+        Each time you upgrade Rsyphon, you must also upgrade the boot
+	media you use to boot the autoinstall system.  Use <command>rsmkautoinstallcd</command> 
+	or <command>rsmkautoinstalldisk</command> to regenerate removable media.  
+      </para>
+    </section>
+    <section>
+      <title>What happened to the binary tarballs?</title>
+      <para>
+        The Rsyphon 3.0.0 release deprecates the binary tarball releases and
+        introduces the boot packages feature, which requires that various
+        components of the Rsyphon system have some sort of version 
+        control.  Without relying on a package management system, version
+        control requires significant effort, so Rsyphon 3.0.0 does not
+        support unpackaged bits. 
+      </para>
+      <para>
+        However, with the build system based on make, you can run commands
+        like <command>make install_server_all</command>, etc., which is now the preferred
+        method for installing without using a package manager, although you need to
+        track down all build dependencies and runtime dependencies by hand.
+      </para>
+    </section>
+  </section>
+</chapter>

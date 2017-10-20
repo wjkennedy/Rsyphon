@@ -1,0 +1,295 @@
+  <refentryinfo>
+    <address>
+      &dhemail;
+    </address>
+    <author>
+      &dhfirstname;
+      &dhsurname;
+    </author>
+    <copyright>
+      <year>2002</year>
+      <holder>&dhusername;</holder>
+    </copyright>
+    &dhdate;
+  </refentryinfo>
+  <refmeta>
+    <refentrytitle>RS_PREPARECLIENT</refentrytitle>
+
+    &dhsection;
+  </refmeta>
+  <refnamediv>
+    <refname>rsprepareclient</refname>
+
+    <refpurpose>prepare a golden client's image for retrieval</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>rsprepareclient</command>
+
+      <arg choice=req><option>--server</option> <replaceable>HOSTNAME</replaceable></arg>
+      <arg><option>--version</option></arg>
+      <arg><option>--help</option></arg>
+      <arg><option>--no-rsyncd</option></arg>
+      <arg><option>--quiet</option></arg>
+      <arg><option>--unit MB | %</option></arg>
+      <arg><option>--yes</option></arg>
+      <arg rep=repeat><option>--exclude <replaceable>DISK</replaceable></option></arg>
+      <arg><option>--no-uyok</option></arg>
+      <arg><option>--my-modules</option></arg>
+      <arg><option>--include-system-firmware</option><option>--firmware-dir <replaceable>DIR</replaceable></option></arg>
+      <arg><option>--kernel <replaceable>FILE</replaceable></option><option> --modules-dir <replaceable>DIR</replaceable></option></arg>
+      <arg><option>--image <replaceable>IMAGENAME</replaceable></option></arg>
+      <arg><option>--filesystem <replaceable>FILESYSTEM</replaceable></option></arg>
+      <arg><option>--ssh-key <replaceable>FILE</replaceable></option></arg>
+      <arg><option>--authorized-keys <replaceable>FILE</replaceable></option></arg>
+      <arg><option>-config <replaceable>FILE</replaceable></option></arg>
+
+    </cmdsynopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>DESCRIPTION</title>
+
+    <para>This manual page documents briefly the
+      <command>rsprepareclient</command> command.</para>
+
+    <para><command>rsprepareclient</command> is a program that prepares
+      a golden client's image for extracting by an image server.</para>
+
+  </refsect1>
+  <refsect1>
+    <title>OPTIONS</title>
+
+    <para>A summary of options is included below.  Only one option is
+      taken.</para>
+
+    <variablelist>
+      <varlistentry>
+        <term><option>--version</option></term>
+        <listitem>
+          <para>Display version and copyright information</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-h</option>, <option>--help</option></term>
+        <listitem>
+          <para>Show summary of options</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-n</option>, <option>--no-rsyncd</option>, <option>--norsyncd</option></term>
+        <listitem>
+          <para>Do not start the rsync daemon</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-q</option>, <option>--quiet</option></term>
+        <listitem>
+          <para>
+	    Run silently.  Return an exit status of 0 for success or a non-zero
+	    exit status for failure
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--server <replaceable>HOSTNAME</replaceable></option>, <option>-s <replaceable>HOSTNAME</replaceable></option></term>
+        <listitem>
+          <para>Hostname or IP address of the image server</para>
+        </listitem>
+      </varlistentry>
+    <varlistentry>
+        <term><option>--exclude-disk <replaceable>DISK</replaceable></option>, <option>-e <replaceable>DISK</replaceable></option></term>
+        <listitem>
+          <para>
+            Do not gather partition information for DISK(s).  The result of
+            using this option, is that DISK(s) will not be partitioned during
+            the auto-install process.
+            You may prefix DISK with "/dev/", but it is not necessary, and a
+            base directory of /dev/ will be assumed.
+            Example: -e /dev/sdb -e sdc -e /dev/ida/c0d0 -e ida/c0d1
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--unit MB | %</option></term>
+        <listitem>
+          <para>
+            Use the specified unit of measurement to save disk informations. If
+            MB is specified the size of the partitions will be reported in
+            absolute values, otherwise with '%' all the values will be reported
+            in percentage relative to the total disk size. Default is MB.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-y</option>, <option>--yes</option></term>
+        <listitem>
+          <para>Answer yes to all yes/no questions</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--no-uyok</option></term>
+        <listitem>
+          <para>
+            Don't create a UYOK (Use Your Own Kernel) boot package.  This option
+            is advantageous if you know you don't need a UYOK kernel, and you
+            want this command to complete faster.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--my-modules</option></term>
+        <listitem>
+          <para>
+            Only include the modules that are currently loaded on this machine
+            when creating the UYOK (Use Your Own Kernel) initrd.img.
+          </para>
+          <para>
+            Without this option, all available modules are included whether or
+            not they are currently in use (except for those listed in the
+            /etc/rsyphon/UYOK.modules_to_exclude file).
+          </para>
+          <para>
+            Including all modules allows your UYOK kernel and initrd.img to be
+            used with a greater variety of client hardware, but can make the
+            resultant initrd.img much larger.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--include-system-firmware</option></term>
+        <listitem>
+          <para>
+            Include the firmwares that are currently installed on this machine
+            when creating the initrd.img.
+          </para>
+          <para>
+            Including all installed firmwares allors you initrd.img to be used
+            with a greater variety of client hardware, but can make the resultant
+            initrd.img larger.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--kernel <replaceable>FILE</replaceable></option></term>
+        <listitem>
+          <para>
+            Do not detect the kernel to use with UYOK, but instead use the
+            file specified by the argument FILE.
+            Use this parameter only with --modules_dir and only if you use UYOK
+            feature.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--modules-dir <replaceable>DIR</replaceable></option></term>
+        <listitem>
+          <para>
+            Get kernel modules to use with UYOK from the DIR repository.
+            Use this parameter only with --kernel and only if you use UYOK
+            feature.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--firmware-dir <replaceable>DIR</replaceable></option></term>
+        <listitem>
+          <para>
+            Get the firmwares to use from the DIR repository.
+            Use this parameter only with --with-system-firmware.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--image <replaceable>IMAGENAME</replaceable></option></term>
+        <listitem>
+          <para>
+            Get kernel and kernel modules automatically from the image specified
+            by IMAGENAME to use with UYOK (if executed on image server).
+            Use this parameter only if you use UYOK feature.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--filesystem <replaceable>FILESYSTEM</replaceable></option></term>
+        <listitem>
+          <para>
+            Force the use of FILESYSTEM to create the initial ramdisk. Use the
+            filesystem name as specified in /proc/filesystems.
+            Important: the filesystem must be statically compiled in the kernel
+            used to install the clients.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--ssh-key <replaceable>FILE</replaceable></option></term>
+        <listitem>
+          <para>
+            Where FILE is the SSH2 id_dsa or id_rsa private key of the user account
+            that the autoinstall client will use to connect to the imageserver.
+          </para>
+          <para>
+            Can be used when installing with the client-driven SSH transport (where
+            clients download the image from the image server using rsync over a SSH
+            tunnel).
+          </para>
+          <para>
+            WARNING: since the private key will be included into the initrd.img it
+            is strongly recommended to not use it to install via network PXE over
+            insecure networks, otherwise the initrd.img will be distributed
+            clear (unencrypted).
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--authorized-keys <replaceable>FILE</replaceable></option></term>
+        <listitem>
+          <para>
+            Specifies the file that contains the public keys that can be used
+            for user authentication from the image server to the imaging clients.
+          </para>
+          <para>
+            Can be used when installing with SSH transport (and the master pushes
+            the image to the clients), or with the installation boot parameter
+            SSHD=y, to execute commands (or open a remote shell) on the imaging
+            clients.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--config <replaceable>FILE</replaceable></option></term>
+        <listitem>
+          <para>
+            Where <replaceable>FILE</replaceable> contains all the settings
+            necessary for the client to set it's hostname and configure it's
+            networking information without DHCP.  This file is copied to
+            <filename>/local.cfg</filename> into the UYOK initrd.img.
+          </para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+  <refsect1>
+    <title>SEE ALSO</title>
+
+    <para><command>rsupdateclient</command>(8)</para>
+    <para><command>rsmkbootpackage</command>(8)</para>
+
+    <para>More details can be found in the <citetitle>Rsyphon
+	manual.</citetitle>
+    </para>
+  </refsect1>
+  <refsect1>
+    <title>AUTHOR</title>
+
+    <para>This manual page was compiled by &dhusername; <&dhemail;> for
+      the &debian; system (but may be used by others).</para>
+
+    <!-- <para>Permission is granted to copy, distribute and/or modify
+      this document under the terms of the <acronym>GNU</acronym> Free
+      Documentation License, Version 1.1 or any later version
+      published by the Free Software Foundation; with no Invariant
+      Sections, no Front-Cover Texts and no Back-Cover Texts.  A copy
+      of the license can be found under
+      <filename>/usr/share/common-licenses/FDL</filename>.</para> -->
+
+  </refsect1>

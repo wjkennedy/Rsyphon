@@ -1,0 +1,23 @@
+#
+# "Rsyphon"
+#
+#    -2001   
+#                          <brian@bgsw.net>
+#    -   
+#                          <brian@bgsw.net>
+#
+#  $Id$
+#
+#  Translated into French  Benoît des gneris <benoit@des.ligneris.net>
+#
+
+***ATTTION!***
+
+NTOUCH PAS À C RÉPTOIR À MOINS DSAVOIR PRÉCISÉMT CQUVOUS FAIT !!
+
+Vous avez le pouvoir de rendre un réseau complet d'ordinateurs disfonctionnel par le simple 
+fait d'altérer un des fichiers présent dans ces répertoires.
+
+Permission, propriétaire, modes, bit collant (sticky-bit) sont très important car ils seront 
+répliqués à l'identique sur chaque client !
+

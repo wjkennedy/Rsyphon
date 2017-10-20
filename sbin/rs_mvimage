@@ -1,0 +1,372 @@
+#!/usr/bin/perl -w
+
+#
+# "Rsyphon" 
+#
+#  Copyright (C) 1999-2006 Brian Elliott Finley
+#
+#  $Id$
+#
+
+# set some variables
+my $VERSION = "SYSTEMIMAGER_VERSION_STRING";
+my $program_name="rsmvimage";
+my $get_help = "         Try \"$program_name -help\" for more options.";
+
+# declare modules
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use strict;
+use File::Copy;
+use File::Path;
+use Getopt::Long;
+use File::Basename;
+use Rsyphon::Server;
+use Rsyphon::Common;
+use Rsyphon::Config;
+use vars qw($VERSION $config);
+
+
+### BEGIN parse the config file ###
+my $autoinstall_script_dir = $config->autoinstall_script_dir();
+unless ($autoinstall_script_dir) {
+    die "FATAL: parameter AUTOINSTALL_SCRIPT_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $rsyncd_conf = $config->rsyncd_conf();
+unless ($rsyncd_conf) {
+    die "FATAL: parameter RSYNCD_CONF is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $rsync_stub_dir = $config->rsync_stub_dir();
+unless ($rsync_stub_dir) {
+    die "FATAL: parameter RSYNC_STUB_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $default_image_dir = $config->default_image_dir();
+unless ($default_image_dir) {
+    die "FATAL: parameter DEFAULT_IMAGE_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $default_override_dir = $config->default_override_dir();
+unless ($default_override_dir) {
+    die "FATAL: parameter DEFAULT_OVERRIDE_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+### END parse the config file ###
+
+# set version information
+my $version_info = <<"EOF";
+$program_name (part of Rsyphon) v$VERSION
+
+Copyright (C) 1999-2006 Brian Elliott Finley <brian\@thefinleys.com>
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOF
+
+# set help information
+my $help_info = $version_info . <<"EOF";
+
+Usage: $program_name [OPTION]... SOURCE_IMAGE DESTINATION_IMAGE
+
+Options: (options can be presented in any order)
+
+ --help
+    Display this output.
+
+ --version
+    Display version and copyright information.
+
+ --verbose
+    Explain what is being done.
+
+ --force
+    Don\'t ask for confirmation before overwriting the destination
+    image or master autoinstall script (if they exist).
+
+ --directory PATH
+    The full path and directory name where you want this image to be
+    stored.  The directory bearing the image name itself will be 
+    placed inside the directory specified here.
+
+Tip: Use \"rslsimage\" to get a list of available images.
+
+Download, report bugs, and make suggestions at:
+http://rsyphon.org/
+EOF
+
+# interpret command line options
+GetOptions( 
+  "help" => \my $help,
+  "version" => \my $version,
+  "directory=s" => \my $destination_path,
+  "force" => \my $force,
+  "verbose|v" => \my $verbose
+) or die qq($help_info);
+
+# if requested, print help information
+if($help) {
+  print qq($help_info);
+  exit 0;
+}
+
+# if requested, print version and copyright information
+if($version) {
+  print qq($version_info);
+  exit 0;
+}
+
+# be sure program is run by root
+Rsyphon::Common->check_if_root();
+
+# Take the arguments left after Getopt::Long parses it's stuff out 
+# as the source and destination image names.
+my $source_image=$ARGV[0];
+my $destination_image=$ARGV[1];
+
+unless(($source_image) and ($destination_image)) {
+  die "\n$program_name: Must specify both SOURCE_IMAGE and DESTINATION_IMAGE.\n$get_help\n\n";
+}
+
+unless($destination_path) { $destination_path = $default_image_dir; }
+
+# Get full path to image. -BEF-
+my $source = Rsyphon::Server->get_image_path( $rsync_stub_dir, $source_image );
+unless($source) { 
+  print "FATAL: Can't get path to image $source_image from $rsyncd_conf!\n";
+  die   "       Nothing has been done.\n";
+}
+
+# Set full destination path. -BEF-
+my $destination = "$destination_path/$destination_image";
+
+$source =~ s,/$,,; # Remove trailing slash (if any). -BEF-
+$source =~ s,//,/,g; # Remove double slashes (if any). -BEF-
+
+$destination =~ s,/$,,; # Remove trailing slash (if any). -BEF-
+$destination =~ s,//,/,g; # Remove double slashes (if any). -BEF-
+
+# SOURCE_IMAGE and DESTINATION_IMAGE can be the same as long as $destination 
+# is different from $source.  Because $source and $destination include the 
+# image names, we're doing the full test here. -BEF-
+#
+if($source eq $destination) {
+  print "\n";
+  print "rsmvimage: SOURCE_IMAGE and DESTINATION_IMAGE must be different or you must\n";
+  print "         specify an alternate destination with -directory.\n";
+  die ("$get_help\n");
+}
+
+# check for existence of destination path
+my $dir = $destination_path;
+unless(-e $dir) {
+  if($force) {
+    mkpath($dir, 0, 0750) or die "FATAL: Can't create $dir!\n";
+  } else {
+    print "FATAL: Destination path \"$dir\" doesn't exist!\n";
+    die ("$get_help\n");
+  }
+}
+
+# check for existence of destination image
+$dir = $destination;
+if(-e $dir) {
+  if($force) {
+    rmtree($dir, 0, 0) or die "FATAL: Can't remove $dir!\n";
+  } else {
+    die "FATAL: Destination image \"$dir\" already exists!\n";
+  }
+}
+
+# Check for existence of destination master autoinstall script.
+# (if source and destination images are named the same, we just won't touch it.)
+unless($source_image eq $destination_image) {
+  my $file="$autoinstall_script_dir/$destination_image.master";
+  if(-e $file) {
+    if($force) {
+      unlink($file) or die "FATAL: Can't remove $file!\n";
+    } else {
+      die "FATAL: Destination master autoinstall script \"$file\" already exists!\n";
+    }
+  }
+}
+
+# move the actual image
+if($verbose) {
+  if($source ne $destination) {
+    print "  Moving image $source to $destination.\n";
+  } else {
+    print "  Moving image $source_image to $destination_image.\n";
+  }
+}
+
+# If the source and destination image directories are different, use rsync to
+# copy the image, then rmtree the old one.  Safer in case the move fails.
+#
+my $cmd;
+my $source_path = dirname($source);
+if($source_path ne $destination_path) {
+  if($verbose) { 
+    $cmd = "rsync -av --delete $source/ $destination/";
+  } else {
+    $cmd = "rsync -a --delete $source/ $destination/";
+  }
+  my $rc = 0xffff & system($cmd);
+  if ($rc != 0) { die "FATAL: Failed to copy $source to $destination.\n"; }
+  rmtree($source) or die "FATAL: Can't remove $source!\n";
+} else {
+  # if source and destination directory are the same, just use move();
+  move($source, $destination) or die "FATAL: Failed to move $source to $destination $!";
+}  
+
+# Move the override
+my $source_override = "$default_override_dir/$source_image";
+my $destination_override;
+if ("$destination_path" eq "$default_image_dir") {
+    $destination_override = "$default_override_dir/$destination_image";
+} else {
+    $destination_override = "$destination_path/override-$destination_image";
+}
+
+$source_override =~ s,/$,,; # Remove trailing slash (if any). -BEF-
+$source_override =~ s,//,/,g; # Remove double slashes (if any). -BEF-
+
+$destination_override =~ s,/$,,; # Remove trailing slash (if any). -BEF-
+$destination_override =~ s,//,/,g; # Remove double slashes (if any). -BEF-
+
+# check for existence of source override
+$dir = $source_override;
+if(-e $dir) {
+    # check for existence of destination override
+    $dir = $destination_override;
+    if (-e $dir) {
+        if($force) {
+            rmtree($dir, 0, 0) or die "FATAL: Can't remove $dir!\n";
+        }
+    }
+    if (-e $dir) {
+            print STDERR "WARNING: Destination override \"$dir\" already exists! move skipped...\n";
+    } else {
+        if ("$destination_path" eq "$default_image_dir") {
+            # if source and destination directory are the same, just use move();
+            move($source_override, $destination_override) or
+                die "FATAL: Failed to move $source_override to $destination_override $!";
+        } else {
+            # move the override using rsync
+            if($verbose) { 
+                $cmd = "rsync -av --delete $source_override/ $destination_override/";
+            } else {
+                $cmd = "rsync -a --delete $source_override/ $destination_override/";
+            }
+        }
+    }
+}
+
+### BEGIN Change entries in $rsyncd_conf ###
+if($verbose) {print "Updating rsyncd.conf entries.\n";}
+Rsyphon::Server->remove_image_stub($rsync_stub_dir, $source_image);
+Rsyphon::Server->create_image_stub($rsync_stub_dir, $destination_image, $destination)
+  or die "$program_name: Cannot create rsync stub entry in $rsync_stub_dir";
+
+Rsyphon::Server->gen_rsyncd_conf($rsync_stub_dir, $rsyncd_conf) 
+  or die "$program_name:  Cannot generate $rsyncd_conf";
+
+### END Change entries in $rsyncd_conf ###
+
+# remove image from flamethrower.conf file
+my $entry_name = $destination_image;
+my $flamethrower_conf = "/etc/rsyphon/flamethrower.conf";
+if(-e $flamethrower_conf) {
+    Rsyphon::Common->add_or_delete_conf_file_entry($flamethrower_conf, $entry_name) or 
+        die "$program_name: Cannot remove entry from $flamethrower_conf";
+
+    # remove override entry from flamethrower.conf file
+    $entry_name = "override_" . $destination_image;
+    Rsyphon::Common->add_or_delete_conf_file_entry($flamethrower_conf, $entry_name) or 
+        die "$program_name: Cannot remove entry from $flamethrower_conf";
+
+    # Add image entry to flamethrower.conf file
+    $entry_name = $destination_image;
+    my $new_entry_data = "[$entry_name]\nDIR = $destination\n";
+    Rsyphon::Common->add_or_delete_conf_file_entry($flamethrower_conf, $entry_name, $new_entry_data) or 
+        die "$program_name: Cannot create entry in $flamethrower_conf";
+
+    # Add override entry to flamethrower.conf file
+    $entry_name = "override_" . $destination_image;
+    $new_entry_data = "[$entry_name]\nDIR = $default_override_dir/$destination_image\n";
+    Rsyphon::Common->add_or_delete_conf_file_entry($flamethrower_conf, $entry_name, $new_entry_data) or 
+        die "$program_name: Cannot create entry in $flamethrower_conf";
+}
+
+# remove BitTorrent files: the torrent file must be re-created
+# if the file name changes (this is done automatically by
+# rsinstallbtimage).
+my $file;
+if($verbose) {print "  Removing BitTorrent files for $source_image.\n";}
+$file = $config->autoinstall_tarball_dir . "/image-" . $source_image . ".tar.gz";
+unlink($file) if (-f $file);
+$file = $config->autoinstall_tarball_dir . "/image-" . $source_image . ".tar";
+unlink($file) if (-f $file);
+$file = $config->autoinstall_torrent_dir . "/image-" . $source_image . ".tar.gz.torrent";
+unlink($file) if (-f $file);
+$file = $config->autoinstall_torrent_dir . "/image-" . $source_image . ".tar.torrent";
+unlink($file) if (-f $file);
+
+if($verbose) {print "  Removing BitTorrent overrides for $source_image.\n";}
+$file = $config->autoinstall_tarball_dir . "/override-" . $source_image . ".tar.gz";
+unlink($file) if (-f $file);
+$file = $config->autoinstall_tarball_dir . "/override-" . $source_image . ".tar";
+unlink($file) if (-f $file);
+$file = $config->autoinstall_torrent_dir . "/override-" . $source_image . ".tar.gz.torrent";
+unlink($file) if (-f $file);
+$file = $config->autoinstall_torrent_dir . "/override-" . $source_image . ".tar.torrent";
+unlink($file) if (-f $file);
+
+### BEGIN Change entries in master autoinstall script ###
+# move master autoinstall script
+# (if source and destination images are named the same, we just won't touch it.)
+unless($source_image eq $destination_image) {
+  if($verbose) {print "Moving $source_image.master to $destination_image.master.\n";}
+  my $old="$autoinstall_script_dir/$source_image.master";
+  my $new="$autoinstall_script_dir/$destination_image.master";
+  move($old, $new) or die "FATAL: Can't move $old to $new: $!";
+
+  # update new master autoinstall script
+  my $file=$new;
+  if($verbose) {print "Updating entries in $destination_image.master.\n";}
+  open (FILE, "<$file") or die "FATAL: couldn't open $file for reading!\n";
+
+  my $tmp_file="/tmp/tmp_file.$$";
+  open (TMP_FILE, ">$tmp_file") or die "FATAL: couldn't open $tmp_file for writing!\n";
+    while (<FILE>) {
+      s/IMAGENAME=["']?${source_image}["']?/IMAGENAME=${destination_image}/;
+      s/OVERRIDES=${source_image}/OVERRIDES=${destination_image}/;
+      s/OVERRIDES=["']${source_image}["']/OVERRIDES="${destination_image}"/;
+      s/OVERRIDES=["']${source_image} (.*)["']/OVERRIDES="${destination_image} $1"/;
+      s/OVERRIDES=["'](.*) ${source_image}["']/OVERRIDES="$1 ${destination_image}"/;
+      s/OVERRIDES=["'](.*) ${source_image} (.*)["']/OVERRIDES="$1 ${destination_image} $2"/;
+      print TMP_FILE;
+    }
+  close TMP_FILE or die "FATAL: Can't close $tmp_file: $!";
+  close FILE or die "FATAL: Can't close $file: $!";
+
+  move($tmp_file, $file) or die "FATAL: Can't move $tmp_file to $file: $!";
+  
+  
+  # re-create soft links
+  if($verbose) {print "Re-creating softlinks to point to $destination_image.master.\n";}
+  $cmd="cd $autoinstall_script_dir; find . -lname $source_image.master -exec ln -sf $destination_image.master \\{\\} \\;";
+  system($cmd);
+  if($? != 0) { die "FATAL: couldn't re-create softlinks pointing to $destination_image.master!"; }
+}
+### END Change entries in master autoinstall script ###
+
+exit 0;
+
+
+
+### BEGIN functions ###
+sub trim {
+  my @out = @_;
+  for (@out) {
+    s/^\s+//;
+    s/\s+$//;
+  }
+  return wantarray ? @out : $out[0];
+}
+### END functions ###
+

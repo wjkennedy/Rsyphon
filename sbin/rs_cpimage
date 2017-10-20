@@ -1,0 +1,335 @@
+#!/usr/bin/perl -w
+
+#
+# "Rsyphon" 
+#
+#  Copyright (C) 1999-2001 Brian Elliott Finley <brian.finley@baldguysoftware.com>
+#  Copyright (C) 2002 Bald Guy Software <brian.finley@baldguysoftware.com>
+#
+#  $Id$
+#
+
+# set some variables
+$VERSION = "SYSTEMIMAGER_VERSION_STRING";
+my $program_name = "rscpimage";
+my $get_help = "  Try \"$program_name -help\" for more options.";
+
+# declare modules
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use strict;
+use File::Copy;
+use File::Path;
+use Getopt::Long;
+use Rsyphon::Server;
+use Rsyphon::Common;
+use Rsyphon::Config;
+use vars qw($config $VERSION);
+
+### BEGIN parse the config file ###
+my $rsync_stub_dir = $config->rsync_stub_dir();
+unless ($rsync_stub_dir) {
+    die "FATAL: parameter RSYNC_STUB_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $autoinstall_script_dir = $config->autoinstall_script_dir();
+unless ($autoinstall_script_dir) {
+    die "FATAL: parameter AUTOINSTALL_SCRIPT_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $rsyncd_conf = $config->rsyncd_conf();
+unless ($rsyncd_conf) {
+    die "FATAL: parameter RSYNCD_CONF is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $default_image_dir = $config->default_image_dir();
+unless ($default_image_dir) {
+    die "FATAL: parameter DEFAULT_IMAGE_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $default_override_dir = $config->default_override_dir();
+unless ($default_override_dir) {
+    die "FATAL: parameter DEFAULT_OVERRIDE_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+
+### END parse the config file ###
+
+### BEGIN functions ###
+sub trim {
+  my @out = @_;
+  for (@out) {
+    s/^\s+//;
+    s/\s+$//;
+  }
+  return wantarray ? @out : $out[0];
+}
+sub check_if_root{
+    unless($< == 0) { die "$program_name: Must be run as root!\n"; }
+}
+### END functions ###
+
+# set version information
+my $version_info = <<"EOF";
+$program_name (part of Rsyphon) v$VERSION
+
+Copyright (C) 1999-2004 Brian Elliott Finley
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOF
+
+# set help information
+my $help_info = $version_info . <<"EOF";
+
+Usage: $program_name [OPTION]... SOURCE_IMAGE DESTINATION_IMAGE
+
+Options: (options can be presented in any order)
+
+ --help
+    Display this output.
+
+ --version
+    Display version and copyright information.
+
+ --verbose
+    Explain what is being done.
+
+ --force
+    Don\'t ask for confirmation before overwriting the destination
+    image or master autoinstall script (if they exist).
+
+ --directory PATH
+    The full path and directory name where you want this image to be
+    stored.  The directory bearing the image name itself will be 
+    placed inside the directory specified here.
+
+ --server HOSTNAME
+    Hostname or IP address of the imageserver from which you want to
+    copy the image.  (Defaults to \"localhost\".)
+
+ --ssh-user USERNAME
+    Username for ssh connection to the imageserver.  Only needed if a
+    secure connection is required.
+
+Tip: Use \"rslsimage\" to get a list of available images.
+
+Download, report bugs, and make suggestions at:
+http://rsyphon.org/
+EOF
+
+# interpret command line options
+GetOptions( 
+  "help" => \my $help,
+  "version" => \my $version,
+  "directory=s" => \my $destination_path,
+  "force" => \my $force,
+  "server=s" => \my $server,
+  "ssh-user=s" => \my $ssh_user,
+  "verbose|v" => \my $verbose
+) or die qq($help_info);
+
+# if requested, print help information
+if($help) {
+  print qq($help_info);
+  exit 0;
+}
+
+# if requested, print version and copyright information
+if($version) {
+  print qq($version_info);
+  exit 0;
+}
+
+# Take the arguments left after Getopt::Long parses it's stuff out 
+# as the source and destination image names.
+my $source_image=$ARGV[0];
+my $destination_image=$ARGV[1];
+
+# default port number
+my $port = "873";
+
+# If we're using SSH, go ahead and establish port forwarding
+if (($ssh_user) and ("$server" ne "127.0.0.1") and ("$server" ne "localhost"))
+{
+  # Get a random port number (normal rsync port won't work if rsync daemon is running)
+  my $port_in_use="yes";
+  until ( $port_in_use eq "no" )
+  {
+    $port_in_use="no";
+    $port = rand 60000;
+    $port =~ s/\..*//;
+
+    # Be sure port isn't reserved
+    my $file="/etc/services";
+    open (FILE, "<$file") || die ("$0: Couldn't open $file for reading\n");
+      while (<FILE>) {
+        if (/$port/) { 
+          $port_in_use="yes";
+          next;
+        }
+      }
+    close FILE;
+  
+    # Be sure port isn't in use
+    open (NETSTAT, "netstat -tn |");
+    while (<NETSTAT>) {
+      (my $junk, my $port_and_junk) = split (/:/);
+      if ($port_and_junk) { 
+        (my $netstat_port, my $other_junk) = split (/ +/, $port_and_junk);
+        if ($netstat_port = /$port/) { 
+          $port_in_use="yes";
+          next;
+        }
+      }
+    }
+  }
+
+  # Setup the port forwarding
+  my $cmd = "ssh -f -l $ssh_user -L $port:$server:873 $server sleep 5";
+  my $rc = 0xffff & system($cmd);
+  if ($rc != 0) { 
+    print "FATAL: Failed to establish secure port forwarding to $server!\n";
+    die   "       Be sure that you can run \"ssh -l $ssh_user $server\" successfully.\n";
+  }
+
+  # and change the source host to point to localhost so we can use the port forwarding
+  $server="127.0.0.1";
+}
+
+# be sure both source and destination images are specified
+unless(($source_image) and ($destination_image)) {
+  die "\n$program_name: Must specify both SOURCE_IMAGE and DESTINATION_IMAGE.\n$get_help\n\n";
+}
+
+# be sure $server name doesn't start with a hyphen
+if($server) {
+  if($server =~ /^-/) { 
+    die "\n$program_name: Server name can\'t start with a hyphen.\n\n$get_help";
+  }
+}
+
+# be sure program is run by root
+check_if_root();
+
+unless($server) { $server="127.0.0.1"; }
+
+unless($destination_path) { $destination_path = $default_image_dir; }
+
+# remove any trailing slash
+$destination_path =~ s/\/$//;
+
+my $source="rsync://$server:$port/$source_image";
+my $destination="$destination_path/$destination_image";
+
+# check for existence of destination path
+my $file=$destination_path;
+unless(-e $file) {
+  if($force) {
+    mkpath($file, 0, 0750) or die "FATAL: Can't create $file!\n";
+  } else {
+    die "FATAL: Destination path \"$file\" doesn't exist!\n";
+  }
+}
+
+# check for existence of destination image
+$file=$destination;
+if(-e $file) {
+  unless($force) { die "FATAL: Destination image \"$file\" already exists!\n"; }
+}
+
+# check for existence of destination master autoinstall script
+$file=$autoinstall_script_dir . "/$destination_image.master";
+if(-e $file) {
+  if($force) {
+    unlink($file) or die "FATAL: Can't remove $file!\n";
+  } else {
+    die "FATAL: Destination master autoinstall script \"$file\" already exists!\n";
+  }
+}
+
+# copy the image
+if($verbose) {print "  Copying image $source_image to $destination_image.\n";}
+my $cmd = "rsync -a --delete $source $destination";
+system($cmd);
+  if($? != 0) { die "FATAL: Failed to copy $source to $destination.\n"; }
+
+# Copy the standard override directory. -BEF-
+if ($verbose) {print "  Copying override directory $source_image to $destination_image.\n";}
+my $source_override = "rsync://$server:$port/overrides/$source_image/";
+my $destination_override = "$default_override_dir/${destination_image}/";
+
+# Test to see if override directory exists
+my $source_override_exists = "no";
+$cmd="rsync rsync://$server:$port/overrides";
+open(INPUT, "$cmd|");
+    while(<INPUT>) {
+        if (m/$source_image/) {
+            $source_override_exists = "yes";
+        }
+    }
+close(INPUT);
+
+if("$source_override_exists" eq "yes") {
+    $cmd="rsync -a --delete $source_override $destination_override";
+    system($cmd);
+    if($? != 0) { 
+        print "WARNING: Failed to copy override directory $source_image to $destination_override.\n";
+        print "         If the source override directory doesn't exist, this shouldn't be\n";
+        print "         considered a problem.  Continuing...\n";
+    }
+} else {
+    print qq(  No override directory for $source_image found.\n) if($verbose);
+}
+
+
+### BEGIN Change entries in $rsyncd_conf ###
+Rsyphon::Server->create_image_stub($rsync_stub_dir, $destination_image, $destination) 
+    or die "$program_name: Cannot create rsync stub entry in $rsync_stub_dir";
+
+Rsyphon::Server->gen_rsyncd_conf($rsync_stub_dir, $rsyncd_conf) 
+    or die "$program_name:  Cannot generate $rsyncd_conf";
+
+### END Change entries in $rsyncd_conf ###
+
+# Add image entry to flamethrower.conf file
+my $entry_name = $destination_image;
+my $new_entry_data = "[$destination_image]\nDIR = $destination\n";
+my $flamethrower_conf = "/etc/rsyphon/flamethrower.conf";
+if(-e $flamethrower_conf ) {
+    Rsyphon::Common->add_or_delete_conf_file_entry($flamethrower_conf, $entry_name, $new_entry_data) or 
+        die "$program_name: Cannot create entry in $flamethrower_conf";
+
+    # Add override entry to flamethrower.conf file
+    $entry_name = "override_" . $destination_image;
+    $new_entry_data = "[override_$destination_image]\nDIR = $default_override_dir/$destination_image\n";
+    Rsyphon::Common->add_or_delete_conf_file_entry($flamethrower_conf, $entry_name, $new_entry_data) or 
+        die "$program_name: Cannot create entry in $flamethrower_conf";
+}
+
+
+### BEGIN Change entries in master autoinstall script ###
+# copy master autoinstall script
+if($verbose) {print "  Copying $source_image.master to $destination_image.master.\n";}
+my $source_script="rsync://$server:$port/scripts/$source_image.master";
+my $destination_script=$autoinstall_script_dir . "/$destination_image.master";
+$cmd="rsync -a $source_script $destination_script";
+system($cmd);
+    if($? != 0) { die "FATAL: Failed to copy $source_script to $destination_script.\n"; }
+
+# update new master autoinstall script
+$file=$destination_script;
+if($verbose) {print "  Updating entries in $destination_image.master.\n";}
+open (FILE, "<$file") or die "FATAL: couldn't open $file for reading!\n";
+
+my $tmp_file = "/tmp/tmp_file.$$";
+open (TMP_FILE, ">$tmp_file") or die "FATAL: couldn't open $tmp_file for writing!\n";
+  while (<FILE>) {
+    s/IMAGENAME=${source_image}/IMAGENAME=${destination_image}/;
+    s/OVERRIDES=${source_image}/OVERRIDES=${destination_image}/;
+    s/OVERRIDES=["']${source_image}["']/OVERRIDES="${destination_image}"/;
+    s/OVERRIDES=["']${source_image} (.*)["']/OVERRIDES="${destination_image} $1"/;
+    s/OVERRIDES=["'](.*) ${source_image}["']/OVERRIDES="$1 ${destination_image}"/;
+    s/OVERRIDES=["'](.*) ${source_image} (.*)["']/OVERRIDES="$1 ${destination_image} $2"/;
+    print TMP_FILE;
+  }
+close TMP_FILE or die "FATAL: Can't close $tmp_file: $!";
+close FILE or die "FATAL: Can't close $file: $!";
+
+move($tmp_file, $file) or die "FATAL: Can't move $tmp_file to $file: $!";
+### END Change entries in master autoinstall script ###
+
+exit 0;

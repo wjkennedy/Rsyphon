@@ -1,0 +1,22 @@
+#
+# "Rsyphon"
+#
+
+See http://www.iana.org/assignments/bootp-dhcp-parameters for details on DHCP
+options.   following are special DHCP options used  Rsyphon.
+
+    option-140  ->  IMAGV
+    option-141  ->  LOG_SV_PORT
+    option-142  ->  SSH_DOWNLOAD_URL
+    option-143  ->  FLAMHROW_DIRTORY_PORTBASE
+    option-144  ->  TMPFS_STAGING
+
+Files in the Rsyphon source code that are affected  these options 
+include:
+
+    sbin/rs_mkdhcpserver
+    initrd_source/skel/etc/dhclient.conf
+    initrd_source/skel/etc/dhclient-script.si-prefix
+    initrd_source/skel/etc/init.d/functions (the write_variables function)
+    doc/examples/local.cfg
+    RDMRsyphon_DHCP_options

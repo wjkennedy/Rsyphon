@@ -1,0 +1,1126 @@
+<chapter>
+  <title>Using Rsyphon</title>
+  
+  <section>
+
+    <title>Installation Procedures Overview</title>
+   
+   <orderedlist>
+	<listitem>
+	<para>
+	  Using the instructions in Chapter 2, install the 
+	  <application>Rsyphon</application> server package
+	  on the machine you have chosen as your image server.  
+	</para>
+      </listitem>
+
+	<listitem>
+	<para>
+	Install GNU/Linux on your golden client and customize as desired.
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	Using the instructions in Chapter 2, install the Rsyphon
+	client software on the golden client.  
+	</para>
+      </listitem>
+
+	<listitem>
+	<para>
+	Run the <command>rsprepareclient</command> command on your golden client.
+	</para>
+      </listitem>
+
+	<listitem>
+	<para>
+	Choose and configure the method for assigning IP addresses to your autoinstall
+	clients.  This information is required for the <command>rsgetimage</command> command
+	in the next step; however, you can change these settings later by running
+	the <command>rsmkautoinstallscript</command> command.
+	</para>
+
+	</listitem>
+	<listitem>
+	<para>
+	Run <command>rsgetimage</command> on the image server to pull the golden
+	client to the image server.
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	Run <command>rsclusterconfig -e</command> to define the groups of
+	clients, populate the image server's <filename>/etc/hosts</filename>
+	and to associate images and overrides to groups. The command
+	<command>rsclusterconfig</command> is available only in Rsyphon
+	3.9.4 or later. Otherwise, you can always use the command
+	<command>rsaddclients</command> (see the next point).
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	This point can be skipped if <command>rsclusterconfig</command> has
+	been used to choose the image to deploy on each client. Otherwise, if
+	you are more familiar with <command>rsaddclients</command> run
+	this command on the image server to tell it which clients will receive
+	what image and to populate the image server's
+	<filename>/etc/hosts</filename> and
+	<filename>/var/lib/rsyphon/scripts/hosts</filename> file.
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	Generate a boot media for your clients. There are four ways to boot
+	the clients for auto-installation:
+	<itemizedlist>
+	  <listitem>
+	    <para>
+	    boot from network (PXE) - see
+	    <command>rsmkclientnetboot(8)</command>
+	    </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	    boot from an auto-install CD - see
+	    <command>rsmkautoinstallcd(8)</command>
+	    </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	    boot from an auto-install disk (USB drive or internal disk) -
+	    see <command>rsmkautoinstalldisk(8)</command>
+	    </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	    boot from a running system - see
+	    <command>rsupdateclient(8)</command>
+	    </para>
+	  </listitem>
+	</itemizedlist> 
+	</para>
+	</listitem>
+
+	<listitem>
+	<para>
+	Autoinstall the golden image on other machines using one (or more)
+	generated boot media.
+	</para>
+	</listitem>
+
+   </orderedlist>
+	<note>
+	<para>
+	  See the Rsyphon Tools section in this chapter for detailed tool
+	descriptions and functions.
+	</para>
+	</note>
+
+<section>
+	<title>Detailed Installation Instructions</title> 
+
+  <orderedlist>
+
+      <listitem>
+	<para>
+	  Install the <application>Rsyphon</application> server package
+	  on the machine you have chosen as your image server, using the instructions
+	  in Chapter 2.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  Install Linux on your "golden client"  and customize
+	  as desired.  Remember that the software installed will
+	  eventually constitute the golden image for all other nodes installed
+	  with <application>Rsyphon</application>.  Don't worry too much
+	  about getting it exactly right the first time, as you can easily
+	  use <application>Rsyphon</application> to make incremental
+	  changes to your image and deploy those changes without doing a
+	  complete re-install.
+	</para>
+	
+      </listitem>
+
+	<listitem>
+	<para>Install the Rsyphon client software on the golden client using the
+	instructions in Chapter 2.
+	</para>
+      </listitem>
+
+	<listitem>
+	    <para>
+	      On the golden client, run the command
+	      <command>rsprepareclient</command> as root.  This will create
+	      various files in your /etc/rsyphon directory that contain
+	      information on your disk partition scheme, filesystem types, etc.
+	      <command>rsprepareclient</command> will also start an rsync daemon
+	      to allow its files to be transferred to a server.  Your golden client 
+		is now ready to have its image pulled by an image server.
+	    </para>
+	    <warning>
+	      <para>
+		If you are not in ssh mode, all files on your
+		golden client are openly accessible to anyone on your network.  
+		Once you have pulled the image from your golden client, the
+                <command>rsync</command> daemon will be automatically stopped.
+	        In case of errors during the image retrieval be sure to manually
+                deactivate the <command>rsync</command> daemon by killing the
+                process or by simply rebooting the golden client. This
+                <command>rsync</command> server will not start automatically on
+                future reboots. In <command>rsync over SSH</command> mode the
+                <command>rsync</command> communication is performed opening a
+                SSH tunnel from the image server to the golden client.
+	      </para>
+	    </warning>
+	  </listitem>
+
+	<listitem>
+	<para>
+	  Choose and configure the method for assigning IP addresses to your 
+	  autoinstall clients.
+	</para>
+	
+	<para>
+	  The most common way to assign IP addresses to autoinstall clients is
+	  DHCP.  To simplify the configuration of the DHCP configuration file
+	  (<filename>/etc/dhcpd.conf</filename>), Rsyphon includes a
+	  utility called <command>rsmkdhcpserver</command>.  
+	  This utility asks you for all the information it needs 
+	  to create a DHCP configuration file that 
+	  is appropriate for your installation of Rsyphon.  After installation, you can 
+	  use DHCP to assign static IP addresses to your clients on
+	  an ongoing basis by running the 
+	  <command>rsmkdhcpstatic</command> command after your
+	  clients have booted and received an IP address.  <command>rsmkdhcpstatic</command>
+	  will modify your <filename>/etc/dhcpd.conf</filename>
+	  file on the imageserver to include static entries for each of your
+	  hosts.
+	</para>
+	
+	<para>
+	  Alternately, you can pass hostname, imageserver, and networking information
+          via installation parameters, in the form of
+          <filename>VARIABLE=value</filename>.
+          Installation parameters can be defined in
+          <filename>/etc/rsyphon/pxelinux.cfg/syslinux.cfg</filename> or can be passed
+          as argument of <command>rsmkautoinstalldisk</command>,
+          <command>rsmkautoinstallcd</command>, or <command>rsmkclientnetboot</command>
+          using the <command>--append "STRING"</command> option.
+          For a complete list of the available installation parameters see 
+          <ulink url="http://wiki.rsyphon.org/index.php/Installation_Parameters">
+            http://wiki.rsyphon.org/index.php/Installation_Parameters
+          </ulink>.
+        </para>
+
+	<para>
+	  Alternatively, if you are using a running system's hard drive as the boot media, you can run 
+	  <command>rsupdateclient -autoinstall -server &lt;imageserver&gt; -configure-from eth0</command>,
+	  which will create a <filename>local.cfg</filename> file at the root of the client's hard
+	  drive containing the existing live network settings. When the autoinstall client 
+	  boots, it will look for this file and use the provided values instead of getting 
+	  them from DHCP and the <filename>/var/lib/rsyphon/scripts/hosts</filename> file on the
+	  image server.
+	</para>
+	
+	<para>
+	</para>
+
+	<example>
+	  <title>Running rsmkdhcpserver</title>
+	  <programlisting>
+[root@imageserver]# rsmkdhcpserver
+	  </programlisting>
+	</example>
+
+	<example>
+	  <title>
+	    Running rsupdateclient with the "-autoinstall" and "-config" options
+	  </title>
+	  <para>
+	    Note that the options <parameter>-autoinstall</parameter>,
+	    <parameter>-server</parameter>, and
+	    <parameter>-configure-from</parameter> are
+	    abbreviated below as <parameter>-a</parameter>,
+	    <parameter>-s</parameter>,
+	    and <parameter>-c</parameter>.  You can abbreviate 
+	    options to minimum uniqueness with most Rsyphon commands.  
+	  </para>
+	  
+	  <para>
+	    Minimum uniqueness means that if two options for a single 
+	    command are similar, such as the <parameter>-image</parameter>
+	    and <parameter>-ip-assignment</parameter> options to
+	    <command>rsgetimage,</command> you can abbreviate them to
+	    <parameter>-im</parameter> and <parameter>-ip</parameter>.
+	  </para>
+	  <programlisting>
+[root@server7]# rsupdateclient -a -s imageserver -c eth0
+Retrieving Rsyphon kernel...
+Retrieving Rsyphon initial ramdisk...
+Adding Rsyphon entry in /etc/lilo.conf...
+running /sbin/lilo -d 50 -D rsyphon ...
+Ignoring entry 'delay'
+Ignoring entry 'default'
+Added linux
+Added rsyphon *
+
+&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+Below are the contents of your /local.cfg file.  Make sure that all
+the variables are filled in and that they contain the proper values.
+You may edit the file directly if you need to change any of the values.
+&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+#
+# "Rsyphon"
+#
+#  Copyright (C) 1999-2010 Brian Elliott Finley
+#
+# This file is: /local.cfg
+#
+HOSTNAME=server7
+DOMAINNAME=mydomain.com
+DEVICE=eth0
+IPADDR=192.168.1.7
+NETMASK=255.255.255.0
+NETWORK=192.168.1.0
+BROADCAST=192.168.1.255
+GATEWAY=192.168.1.254
+GATEWAYDEV=eth0
+IMAGESERVER=192.168.1.203
+	  </programlisting>
+        </example>
+      </listitem>
+
+      <listitem>
+	<para>
+	  Run <command>rsgetimage</command> on the image server to pull the image
+	  from the golden client to the image server.
+	</para>
+
+	<para>
+	  With <command>rsgetimage</command> the image server pulls all
+          the files and directories from the root of the client's filesystem back to the
+          image repository in <filename>/var/lib/rsyphon/images</filename>.
+	</para>
+	
+	<para>
+	  The basic syntax is: "<command>rsgetimage</command> <command>-golden-client</command> [client_hostname] <command>-image</command> [image_name]"
+	</para>
+	<para>
+	  Where [client_hostname] is the hostname or IP address of the
+	  "golden client" and [image_name] is the name you want to give
+	  to this image.  You can see many other options with
+	  "<command>man rsgetimage</command>."
+	</para>
+	
+	<example>
+	  <title>Running rsgetimage</title>
+	  <programlisting>
+	    [root@imageserver]# rsgetimage -golden-client my-golden-client \
+            > -image web_server_image_v1
+	  </programlisting>
+	</example>
+
+	<para><command>rsgetimage</command> contacts the golden client and
+	  requests its <filename>/etc/rsyphon/mounted_filesystems</filename> file,
+	  which contains the list of mounted filesystems and their mount
+	  points.  <command>rsgetimage</command> pulls out the mount points for the filesystems that
+	  are unsupported and creates an exclusion list.  The filesystems
+	  Rsyphon currently supports ext2, ext3, ext4, reiserfs, xfs, jfs and
+	  vfat. All other filesytems will be ignored, including proc, nfs,
+	  devpts, iso9660, etc.
+	</para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Run <command>rsclusterconfig</command> to manage the groups of your
+          clients in the Rsyphon database.
+        </para>
+        <para>
+          <command>rsclusterconfig</command> can be used also to show the
+          defined groups with the list of clients that belong to each group
+          and/or the image associated to each client or group of clients.
+          In show-mode the command accepts as argument a list of hostnames,
+          host-ranges and/or host-group, it resolves them in the equivalent
+          list of hostnames and prints them to stdout. The edit-mode can be
+          interactive (option -e) or batch (option -u).
+          In interactive edit-mode rsclusterconfig opens an editor in your
+          terminal that allows to modify the client group definitions and
+          their properties using a XML syntax. In batch edit-mode it only
+          parses the pre-defined XML configuration
+          (<filename>/etc/rsyphon/cluster.xml</filename>) and refresh the
+          opportune Rsyphon internal configuration files.
+        </para>
+        <warning>
+          <para>
+          Do not edit <filename>/etc/rsyphon/cluster.xml</filename> directly.
+          Always use <command>rsclusterconfig -e</command> to be sure that
+          all the files needed by the installations process will be properly
+          synchronized.
+          </para>
+        </warning>
+        <para>
+          Here is a well-commented example of a simple cluster configuration:
+          <programlisting>
+&lt;?xml version='1.0' standalone='yes'?&gt;
+&lt;!--
+
+********************************* WARNING **************************************
+
+This file has been generated by rsclusterconfig(8), do not edit manually!
+
+********************************* WARNING **************************************
+
+        This is the main configuration file to describe the topology of
+        your clients and your image server informations.
+
+        This file will be used by all the Rsyphon commands to identify the
+        logical groups of your clients and their specific configurations.
+
+        See comments below for more details.
+--&gt;
+&lt;xml&gt;
+        &lt;!-- The image server hostname. --&gt;
+        &lt;master&gt;master1&lt;/master&gt;
+
+        &lt;!--
+                This is the global name:  this name will be used to identify
+                all the hosts defined in this file (the global supergroup).
+
+                IMPORTANT: this is a mandatory entry!!!
+        --&gt;
+        &lt;name&gt;all&lt;/name&gt;
+
+        &lt;!--
+                This is the global override: all the files stored in this
+                overrides will be pushed to all the clients.
+
+                IMPORTANT: this is a mandatory entry!!! If you don't want to use
+                it do not create the global override in
+                /var/lib/rsyphon/overrides/
+
+                Multiple overrides can be specified as a list of multiple XML tags:
+
+                &lt;override&gt;OVERRIDE_NAME_1&lt;/override&gt;
+                &lt;override&gt;OVERRIDE_NAME_2&lt;/override&gt;
+                ...
+                &lt;override&gt;OVERRIDE_NAME_N&lt;/override&gt;
+
+                The OVERRIDE_NAME_1 ... OVERRIDE_NAME_N will be distributed
+                preserving the same order as they appear in the XML file. This
+                means that in case of file overlaps (more files in multiple
+                overrides that should be distributed to the same target
+                filename) the first hit wins. In this case OVERRIDE_NAME_1 is
+                the most important and OVERRIDE_NAME_N is the least important.
+        --&gt;
+        &lt;override&gt;all&lt;/override&gt;
+
+        &lt;!--
+                Following there is an example of a &quot;fake&quot; group. The group
+                name is &quot;Local&quot;, it uses the image &quot;Local&quot;, the override in
+                /var/lib/rsyphon/overrides/Local and it contains only
+                the localhost server. Totally useless, but it's there to
+                explain how it works... ;-)
+        --&gt;
+        &lt;group&gt;
+                &lt;name&gt;Local&lt;/name&gt;
+                &lt;image&gt;Local&lt;/image&gt;
+                &lt;override&gt;Local&lt;/override&gt;
+                &lt;node&gt;localhost&lt;/node&gt;
+        &lt;/group&gt;
+
+        &lt;!--
+                This is a group that contains two nodes: node001 and
+                node002. The group is called &quot;Login&quot; and it uses the
+                override:
+
+                The clients node001 and node002 will be auto-installed using the
+                image:
+
+                /var/lib/rsyphon/images/SuSE10
+
+                And the override:
+
+                /var/lib/rsyphon/overrides/SuSE10_frontend
+
+                After the initial installation it will be possible to keep in
+                sync the common files for the Login group creating them into the
+                &quot;SuSE10_frontend&quot; override and using the command
+                rspushoverride(8).
+
+                It will be even possible to define host-only files creating an
+                override using the hostname of the target client. For example
+                all the files in /var/lib/rsyphon/overrides/node001 will be
+                distributed only to node001 (and in case of overlaps these files
+                will replace the files that come from the group override and
+                from the global override).
+        --&gt;
+        &lt;group&gt;
+                &lt;name&gt;Login&lt;/name&gt;
+                &lt;!--
+                        If a client belongs to multiple groups, the group with
+                        the higher priority will be used to choose the image
+                        for that client; for the overrides the groups will be
+                        sorted by group priority: in case of file overlaps
+                        first hit wins.
+
+                        In this example node001, that belongs to the group
+                        Login and Storage, will be auto-installed with the
+                        image SuSE10 and it'll receive the overrides in the
+                        following order (remember that in case of file overlaps
+                        first hit wins):
+
+                          SuSE10_frontend, SuSE10, Storage
+
+                --&gt;
+                &lt;priority&gt;10&lt;/priority&gt;
+                &lt;image&gt;SuSE10&lt;/image&gt;
+                &lt;!--
+                        Also a group can have multiple overrides. The same
+                        rules for multiple values of the global overrides are
+                        valid also here.
+                --&gt;
+                &lt;override&gt;SuSE10_frontend&lt;/override&gt;
+                &lt;override&gt;SuSE10&lt;/override&gt;
+                &lt;node&gt;node001,node002&lt;/node&gt;
+        &lt;/group&gt;
+
+        &lt;!--
+                Another example. The group Storage contains 16 nodes (from
+                node1293 up to node1308). They will be auto-installed using the
+                image:
+
+                /var/lib/rsyphon/images/RHEL4
+
+                And the override:
+
+                /var/lib/rsyphon/overrides/Storage
+
+                In general the best practice is to use the same name for the
+                override and the group name (like this group).
+        --&gt;
+        &lt;group&gt;
+                &lt;name&gt;Storage&lt;/name&gt;
+                &lt;priority&gt;20&lt;/priority&gt;
+                &lt;image&gt;RHEL4&lt;/image&gt;
+                &lt;override&gt;Storage&lt;/override&gt;
+                &lt;node&gt;node001,node1293-node1308&lt;/node&gt;
+        &lt;/group&gt;
+
+        &lt;!--
+                Define your custom groups below (and remember to remove
+                or comment the previous entries if you don't want to use
+                them).
+
+                ...
+        --&gt;
+
+&lt;/xml&gt;
+          </programlisting>
+        </para>
+      </listitem>
+      
+      <listitem>
+        <para>
+          <command>rsaddclients</command> creates a symbolic link to the master 
+          script for the image to which each specified autoinstall client is 
+          assigned.  <command>rsaddclients</command> also
+	  populates the image server's <filename>/etc/hosts</filename> and 
+	  <filename>/var/lib/rsyphon/scripts/hosts</filename> files.  The
+	  hosts file provides the default mechanism used by autoinstall clients
+	  to look up their hostnames.
+	  <warning>
+	  <para>
+	    You can skip the <command>rsaddclients</command> step if
+	    <command>rsclusterconfig</command> has been used at the previous point.
+	    Remember also that <command>rsaddclients</command> is deprecated
+	    in favor of <command>rsclusterconfig</command>, so it is always
+	    suggested to always use <command>rsclusterconfig</command>.
+	  </para>
+	  </warning>
+	</para>
+	<para>
+	  When <command>rsaddclients</command> is run without arguments, it 
+	  takes you through three configuration screens interactively.
+	</para>
+	<orderedlist>
+	  <listitem>
+	    <para>
+	      In the first configuration screen <command>rsaddclients</command>,
+	      asks you to specify the hostname pattern of your autoinstall clients.  
+              Autoinstall client hostnames are defined by a host-range string
+              and a domain name string.
+	      For example, if you choose "rsyphon.org" as your domain name, and
+	      "www07-www11,www20" as your range, you will define the following
+	      autoinstall clients:
+	    </para>
+	    <simplelist>
+	      <member>www07.rsyphon.org</member>
+	      <member>www08.rsyphon.org</member>
+	      <member>www09.rsyphon.org</member>
+	      <member>www10.rsyphon.org</member>
+	      <member>www11.rsyphon.org</member>
+	      <member>www20.rsyphon.org</member>
+	    </simplelist>
+	  </listitem>
+	  <listitem>
+	    <para>
+	      In the second screen, you map the clients defined in Section 1 to an image.
+	      This section is optional if <command>rsclusterconfig</command>
+	      has been used.
+	    </para>
+	    <note>
+	      <para>
+		Each invocation of <command>rsaddclients</command> allows you
+		to map a single range of clients to an image.
+		If you want to map different client ranges to different
+		images, you must execute the
+		<command>rsaddclients</command> command multiple times.
+	      </para>
+	    </note>
+	  </listitem>
+	  <listitem>
+	    <para>
+	      In the third configuration screen, the <command>rsaddclients</command> command asks
+	      you for a range of IP addresses from which it populates your
+	      <filename>/etc/hosts</filename> and
+	      <filename>/var/lib/rsyphon/scripts/hosts</filename> files.
+	      When an autoinstall clients boots, it will attempt to retrieve
+	      the latter file from the image server and use it to look up its
+	      hostname.  If this step fails, the client will attempt to do
+	      a reverse DNS lookup.  If you have PTR records configured for
+	      each of your autoinstall clients, you can skip the third configuration
+		step; however, it is recommended to complete it because it is more robust.
+	    </para>
+	<example>
+	  <title>Entries in /etc/hosts created by rsaddclients</title>
+        <para>
+          If you give <command>rsaddclients</command>
+          a range of IPs from "192.168.1.1-192.168.1.99", a hostname range of
+          "server1-server99" and "mydomain.com" as domain name,
+          then it would generate the following <filename>/etc/hosts</filename>
+          file:
+	  <programlisting>
+192.168.1.1    server1.mydomain.com  server1
+192.168.1.2    server2.mydomain.com  server2
+192.168.1.3    server3.mydomain.com  server3
+192.168.1.4    server4.mydomain.com  server4
+192.168.1.5    server5.mydomain.com  server5
+192.168.1.6    server6.mydomain.com  server6
+192.168.1.7    server7.mydomain.com  server7
+192.168.1.8    server8.mydomain.com  server8
+192.168.1.9    server9.mydomain.com  server9
+192.168.1.10   server10.mydomain.com  server10
+192.168.1.11   server11.mydomain.com  server11
+
+[ ... etc, etc, etc ... ]
+
+192.168.1.97    server97.mydomain.com  server97
+192.168.1.98    server98.mydomain.com  server98
+192.168.1.99    server99.mydomain.com  server99
+	  </programlisting>
+        </para>
+      </example>
+
+
+      </listitem>
+      </orderedlist>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  Create a boot media to auto-install your clients.
+	</para>
+	
+	<para>
+	  You can use one of four methods to autoinstall the clients:
+	</para>
+	<itemizedlist>
+	  <listitem>
+	    <para>
+	      Boot the system from a USB disk or an internal disk.
+	    </para>
+	    
+	    <para>
+	      Run <command>rsmkautoinstalldisk</command> to create an
+	      autoinstall USB disk (or a generic disk) that you can use with any
+	      machine.
+	    </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	      Boot the system from a CDROM.
+	    </para>
+	    
+	    <para>
+	      Run <command>rsmkautoinstallcd</command> to create an ISO image
+	      that can be burned to CDROM.  You can use the CDROM to boot
+	      your autoinstall clients and use it with any machine.
+	    </para>
+	  </listitem>
+	  
+	  <listitem>
+	    <para>
+	      Auto-install the images from a running system.
+	    </para>
+	    
+	    <para>
+	      If your client is already running GNU/Linux you can simply
+	      execute the <command>rsupdateclient</command> command and
+	      run it with the <parameter>-autoinstall</parameter> option.
+	    </para>
+	    <example>
+	      <title>
+		Booting the autoinstall media from a running system's hard drive
+	      </title>
+	      <programlisting>
+		[root@server7]# rsupdateclient -a -s imageserver -c eth0
+	      </programlisting>
+	    </example>
+	  </listitem>
+	  
+	  <listitem>
+	    <para>
+	      Boot the system from the network. If your systems are network-boot
+              capable, using PXE for example, you can start an autoinstall without
+              using local media.    
+	    </para>
+	    
+	    <para>
+	      PXE is usually enabled through a BIOS setting.  Booting can be 
+              unstable and client side firmware is not
+	      consistent.
+	    </para>
+	    
+	    <para>
+              <application>Rsyphon</application> comes with the
+	      <command>rsmkbootserver</command> utility to help configure a
+              PXE server.  Running <command>rsmkbootserver</command> is an
+	      iterative process.  It will attempt to generate an appropriate
+	      tftproot directory, configure your tftp server, and run various
+	      tests to see if things are functioning properly.  Once
+	      <command>rsmkbootserver</command> detects an error, it will fail
+	      out and generate an error message.  When you have corrected the error, you can
+	      re-execute <command>rsmkbootserver</command>, and repeat until it exits successfully.
+	      <command>rsmkbootserver</command> will probably not work with all PXE
+	      clients.  If it fails to work with your configuration, please
+	      send a mail to
+	      <ulink url="mailto:sisuite-users@lists.sourceforge.net">sisuite-users@lists.sourceforge.net</ulink>.
+	    </para>
+	  </listitem>
+	  <listitem>
+            <para>
+            Now it's time to install the images on your clients simply
+            booting them with the generated boot media and waiting for the
+            full auto-installation.
+            </para>
+	  </listitem>
+	</itemizedlist>
+	
+      </listitem>
+    </orderedlist>
+  </section>
+
+    <section>
+      <title>Rsyphon Tools</title>
+      <section>
+	<title>the <command>rsprepareclient</command> command</title>
+	<itemizedlist>
+	  <listitem>
+	    <para>
+	    After configuring the golden client, run the <command>rsprepareclient</command> command 
+	    to create a file with the partition informations from your disks that
+            will be put it in <filename>/etc/rsyphon/autoinstallscript.conf</filename>.
+	    </para>
+	  </listitem>
+	  
+	  <listitem>
+	    <para>
+	      <command>rsprepareclient</command> will also create a temporary
+              rsync(1) configuration file (in <filename>/tmp</filename> and
+              start rsync in server mode (<command>rsync --daemon</command>).
+              This step allows the image server to pull the image from the
+              client but will not cause the rsync daemon to be restarted after
+              the golden client is rebooted, helping avoid security concerns
+              from sharing a golden client's root filesystem via rsync.
+              Once the image is successfully pulled from the golden client,
+              this <command>rsync</command> daemon will be automatically
+              stopped.
+	    </para>
+	  </listitem>
+	</itemizedlist>
+	</section>
+
+	<section>
+	<title>The <command>rsgetimage</command> command</title>
+	<itemizedlist>
+	  <listitem>
+	    <para>
+	      After running <command>rsprepareclient</command>, run the the <command>rsgetimage</command>
+	      command on the image server. For example :
+	      <command>rsgetimage -golden-client 192.168.1.1 -image my_webserver_image_v1</command>
+	    </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	      <command>rsgetimage</command> contacts the golden client and requests its 
+	      <filename>/etc/rsyphon/mounted_filesystems</filename> 
+	      file, which contains the list of mounted filesystems and the devices on which they are 
+	      mounted.  It pulls out the mount points for the filesystems that are unsupported and 
+	      creates an exclusion list. Currently supported filesystems are ext2, 
+	      ext3, ext4, and reiserfs. 
+	      All other filesystems are unsupported, including proc, 
+	      devpts, iso9660, etc.
+	    </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	      <command>rsgetimage</command> then pulls the golden client's entire system image, excluding the filesystems 
+	      in the exclusion list, by connecting to the rsync daemon running on the golden client.  
+	      All the files from the client will be copied over, recreating the file and directory 
+	      hierarchy in the image directory.
+	    </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	      You can also use <command>rsgetimage</command> to update an
+	      existing image by simply specifying an existing image name, for
+	      example,
+	      <command>rsgetimage -golden-client 192.168.1.1. -image &lt;imagename&gt;.</command>
+	      <command> rsgetimage</command> then updates the image to match
+	      the files on your golden client. When you do this, only the parts
+	      of files that are different will be copied over. Files that exist 
+	      in the old image but not on the golden client will be
+	      <emphasis>deleted</emphasis>, and files that exist in both places but have 
+	      changed will be <emphasis>updated</emphasis>.
+	      <command>rsgetimage</command> is one way to update an image when
+	      new security patches or other system updates come out. However,
+	      this method is revision control on an image-by-image basis, and
+	      not true revision control where individual file revisions are 
+	      tracked on a line-by-line basis. The recommended method is never
+	      to overwrite a known working image. Revision control on an
+	      image-by-image basis also ties in to the
+	      <command>rsupdateclient</command> command.
+	      By default, all images are stored in the parent directory of 
+	      <filename>/var/lib/rsyphon/images/</filename> in a directory
+	      that bears the image name.
+	      For example:
+	      <itemizedlist>
+	      <listitem>
+	      <para><filename>/var/lib/rsyphon/images/my_webserver_image_v1/</filename></para>
+	      </listitem>
+	      <listitem>
+	      <para><filename>/var/lib/rsyphon/images/my_webserver_image_v2/</filename></para>
+	      </listitem>
+	      <listitem>
+	      <para><filename>/var/lib/rsyphon/images/my_webserver_image_HEAD/</filename></para>
+	      </listitem>
+	      <listitem>
+	      <para><filename>...</filename></para>
+	      </listitem>
+	      </itemizedlist>
+	    </para>
+	  </listitem>
+	</itemizedlist>
+      </section>
+      
+      <section>
+	<title>Autoinstall scripts</title>
+	<itemizedlist>
+	  <listitem>
+	    <para>
+	      After <command>rsgetimage</command> has pulled the files to the
+	      image directory on the imageserver, it creates an auto-install
+	      script customized for the image. The auto-install script in this
+	      example is named "my_webserver_image_v1.master". All auto-install
+	      scripts are placed in the
+	      <filename>/var/lib/rsyphon/scripts</filename> directory.
+	    </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	      The disk partitioning information left behind by the
+	      <command>rsprepareclient</command> command adds the necessary
+	      commands to re-partition the disk(s) on the autoinstall clients.
+	      </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	      Filesystem informations are taken from the
+              <filename>/etc/rsyphon/autoinstallscript.conf</filename> file
+              in the image (i.e.
+              <filename>/var/lib/rsyphon/images/my_webserver_image_v1/etc/rsyphon/autoinstallscript.conf</filename>)
+              and used to determine the appropriate filesystem creation commands
+	      and to determine mount points for the autoinstall process.
+	      Networking informations are added to the autoinstall script based
+	      on command line options passed to <command>rsgetimage</command>
+	      or information it prompts you for. This information is added in
+	      variable form as the autoinstall client will determine the values
+	      for things such as its hostname and IP address during the autoinstall 
+	      process.
+	    </para>
+	  </listitem>
+	</itemizedlist>
+      </section>
+      
+      <section>
+	<title>The <command>rsaddclients</command> and <command>rsclusterconfig</command> commands</title>
+	<itemizedlist>
+	  <listitem>
+	    <para>
+	      After running <command>rsgetimage</command>, run the
+	      <command>rsclusterconfig</command> command, which opens an
+	      interactive editor where you can define the bindings of your
+	      images with your groups of clients.
+	    </para>
+	    <para>
+	      The same operation can be done by
+	      <command>rsaddclients</command>, which asks you for the
+	      hostname range you will be installing, but it doesn't have
+	      the concept of host groups, so you can specify only host
+	      ranges or single hostnames (the same can be done by
+	      <command>rsclusterconfig</command>).
+	      <command>rsaddclients</command> prompts you to choose the
+              image that will be installed to these hosts and creates symbolic 
+	      links for each hostname that point to the master autoinstall
+	      script for that image. For example:
+	      "www3.sh -> web_server_image_v1.master".
+	    </para>
+	    <para>
+	      If the image is updated and you allow
+	      <command>rsgetimage</command> to update the master autoinstall
+	      script also, then each of the associated soft links will point to
+	      the updated autoinstall script. If individual host configuration
+	      is necessary, the soft link for that host can be removed and
+	      replaced with a copy of the master autoinstall script that can
+	      then be customized for that host.
+	      This customization is a manual process and is up to the system
+	      administrator, but it is stronly suggested to limit these
+	      manual customizations and to always double check them before
+	      opening a new bug.
+	    </para>
+	    <warning>
+	      <para>
+	        The configurations made by <command>rsaddclients</command>
+	        can ovverride the configurations made by
+	        <command>rsclusterconfig</command>.
+		In order to exclude unexpected problems it is strongly
+		suggested to always use <command>rsclusterconfig</command>, and leave
+		<command>rsaddclients</command> only to populate /etc/hosts.
+	      </para>
+	    </warning>
+	  </listitem>
+	</itemizedlist>
+      </section>
+
+	<section>
+	<title>Additional Installation Information</title>
+	<itemizedlist>
+	<listitem>
+	    <para>
+	      The unattended install procedure is flexible and works with
+	      almost any available hardware. You can also easily modify it to
+	      work with new or special hardware.
+	    </para>
+	    <para> 
+	      A miniature Linux distribution called Brian's Own Embedded Linux
+	      (BOEL) is used for autoinstalls. It consists of a customized
+	      kernel and an initial ram disk that contains only the specific 
+	      commands and utilities necessary to perform autoinstalls. The
+	      same kernel and initial ram disk (<filename>initrd.img</filename>)
+              can be used to boot from USB disks, CDROMs, the network, or any
+              running Linux system's local hard drive.
+	    </para>
+	    <para>
+	      The <command>rsmkautoinstalldisk</command> and
+	      <command>rsmkautoinstallcd</command> commands use the
+	      <command>syslinux(2)</command> utility to create disks and CDROMs
+	      that will boot the Rsyphon kernel and initial ram disk.
+	      <command>pxelinux(2)</command>, which is a sister tool to
+	      <command>syslinux</command>, allows the same kernel and initial
+	      ram disk to boot PXE capable machines from the network. Both
+	      <command>syslinux</command> and <command>pxelinux</command>
+	      need a configuraton file, but the two tools can use the same one
+	      and <application>Rsyphon</application> handles this for you.
+	    </para>
+	</listitem>
+
+	  <listitem>
+	    <para>
+	      The standard autoinstall kernel contains all the necessary
+	      drivers for the majority of systems. Custom kernels can be
+	      generated using UYOK feature to meet special disk and network
+	      driver requirements.
+	    </para>
+            <para>
+             To use UYOK and generate <filename>kernel</filename>+<filename>initrd.img</filename>
+             goes to your golden client and run the following command:
+
+	  <programlisting>
+# rsprepareclient --server servername --no-rsyncd --my-modules
+	  </programlisting>
+
+             The initrd.img will be generated on the fly from the initrd_template package
+             (eg. rsyphon-i386initrd_template). If you specify --no-rsyncd argument,
+             rsyncd will be not restarted. With --my-modules you can save a lot of space in
+             the UYOK initrd, because only the the modules that are currently loaded in your
+             golden client will be included. Without --my-modules all the available modules
+             will be added into the initrd allowing your UYOK kernel+initrd.img to be used
+             also with heterogeneous clients.
+
+             If all goes well you'll find the UYOK kernel+initrd.img in
+             /etc/rsyphon/boot/ in your golden client. When you run rsgetimage from
+             your image server (in this case do not specify --no-rsyncd) the UYOK kernel and
+             initrd.img will be transferred to
+             /usr/share/rsyphon/boot/&lt;arch&gt;/&lt;name_of_your_image&gt; in your image server.
+
+             In general, if you have an heterogeneous environment (clients with different
+             hardware and components) it's better to use the standard BOEL
+             kernel+initrd, because the standard kernel is strongly optimized to obtain better
+             performances. In the other cases, in particular if you have
+             3rd-party or custom kernel modules it's strongly recommended to use UYOK.
+            </para>
+	</listitem>
+	<listitem>
+	  <para>
+          Once the kernel has booted, it mounts the initial ram disk as its
+          root filesystem. The kernel then executes an initialization script
+          on the ram disk that has been written to do
+          <application>Rsyphon</application>-specific tasks. This script
+          will use either a configuration file
+          (<filename>/local.cfg</filename>), installation parameters (passed
+          by the kernel boot options, see
+          <ulink url="http://wiki.rsyphon.org/index.php/Installation_Parameters">http://wiki.rsyphon.org/index.php/Installation_Parameters</ulink>
+          for a complete and up to date list of installation parameters), or a
+          combination of DHCP and the
+          <filename>/var/lib/rsyphon/scripts</filename> file pulled from
+          the image server to determine the autoinstall client's IP address
+          and hostname information.
+          </para>
+
+	  <para>
+            If DHCP is used, the client parses the hosts file which was 
+            retrieved from the image server to find its IP address and 
+            determine its hostname.  Finally, the client retrieves an 
+            autoinstall script from the image server based on its hostname and
+            executes it.  The autoinstall script is image specific, 
+            determining which image a client will receive. Following is a 
+            summary: 
+	    IP address -> hostname -> image specific autoinstall script named 
+            with hostname.
+          </para>
+	</listitem>
+	</itemizedlist>
+	</section>
+
+	<section><title>How to Update an Image</title>
+	<itemizedlist>
+	  <listitem>
+	    <para>
+	      If you want to update an image on your image server, you can use
+	      one of the two following methods:
+	    </para>
+	    <orderedlist>
+	      <listitem>
+		<para>
+		  Directly edit the files in the image directory.  The best way
+		  to do this is to <command>chroot</command> into the image
+		  directory. You can then work with the image as if it were a
+		  running machine. You can even install packages with
+		  <command>apt-get</command>, <command>aptitude</command> or
+		  <command>RPM</command> and <command>yum</command> for
+		  example.
+		</para>
+	      </listitem>
+	      <listitem>
+		<para>
+		  Run the <command>rsgetimage</command> command again,
+		  specifying a golden client that has been modified in the
+		  desired way.  Again, only the parts of the files that have
+		  changed will be pulled across. Files that have been deleted
+		  on the golden client will also be deleted in the image. You
+		  have the option to update the master autoinstall script for
+		  the image (suggested) or leave it alone. The advantages of
+		  running the <command>rsgetimage</command> command are that
+		  you can verify that your new configuration works on the
+		  golden client and that the master autoinstall script is
+		  updated.
+		</para>
+              </listitem>
+            </orderedlist>
+	  </listitem>
+	    <listitem>
+	      <para>
+		Once a system has been autoinstalled, you can use the
+		<command>rsupdateclient</command> command to update a client
+		system to match a new or updated image on the image server. So,
+		for example, if you've installed your company's 300 web servers
+		and a security patch comes out the next day, you can simply
+		update the image on the image server and run
+		<command>rsupdateclient</command> on each of your web servers.
+		Only the modified files are pulled over, so your site is
+		patched very quickly. You should create an entirely new image
+		with a new version number so that you have some form of
+		revision control. This way, if you find out that the patch you
+		applied corrupted your entire web farm, you can simply do a
+		<command>rsupdateclient</command> back to the last known
+		working image.
+	      </para>
+	      <warning>
+	      <para>
+	        In any case it is always suggested to stop the production in
+	        the machines before running the update via
+	        <command>rsupdateclient</command>, since some files used by
+	        the running applications could be potentially updated or
+	        removed while the applications are using them.
+	      </para>
+	      </warning>
+	    </listitem>
+	    <listitem>
+	      <para>
+		  You can also use the <command>rsupdateclient</command>
+		  command with the <option>-autoinstall</option> option to
+		  copy the autoinstall kernel and initial ram disk to the local
+		  hard drive of an autoinstall client that is currently
+		  running, but in this way the image needs to be re-deployed.
+		  <command>rsupdateclient</command> then modifies the
+		  boot-loader configuration to include an appropriate entry for
+		  the new kernel and initial ram disk and makes this new kernel
+		  the default. The next time the client system boots, it loads
+		  the Rsyphon kernel and initial ram disk, which begins
+		  the autoinstall process. 
+		  You can therefore remotely re-deploy any running Linux
+		  machine without feeding the machine any external CD or USB
+		  disk and without having to reconfigure the BIOS to boot off
+		  the network, which can be quite problematic with some BIOSes.
+	      </para>
+	    </listitem>
+	</itemizedlist>
+      </section>
+    </section>
+  </section>
+</chapter>
+<!-- Keep this comment at the end of the file
+Local variables:
+mode: sgml
+sgml-omittag:nil
+sgml-shorttag:t
+sgml-namecase-general:t
+sgml-general-insert-case:lower
+sgml-minimize-attributes:nil
+sgml-always-quote-attributes:t
+sgml-indent-step:2
+sgml-indent-data:t
+sgml-parent-document:nil
+sgml-exposed-tags:nil
+sgml-local-catalogs:nil
+sgml-local-ecat-files:nil
+End:
+-->

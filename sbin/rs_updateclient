@@ -1,0 +1,817 @@
+#!/usr/bin/perl -w
+
+#
+#   "Rsyphon"
+#
+#   Copyright (C) 1999-2006 Brian Elliott Finley
+#   Copyright (C) 2002 International Business Machines
+#                      Sean Dague <sean@dague.net>
+#
+#   $Id$
+#
+#   This program is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; either version 2 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program; if not, write to the Free Software
+#   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+#   Others who have contributed to this code (in alphabetical order):
+#     Adam L. Lambert <alambert@epicrealm.com> 
+#     - (credit for the -autoinstall option goes to Adam)
+#
+#   2004.09.21  Brian Elliott Finley
+#   - Fix, I hope, logic in detecting transfer failures
+#
+
+
+# declare modules
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use Carp;
+use POSIX;
+use strict;
+use Socket;
+use AppConfig;
+use File::Copy;
+use Getopt::Long;
+use Sys::Hostname;
+use Rsyphon::Common;
+use Rsyphon::Options;
+use Rsyphon::UseYourOwnKernel;
+use vars qw($config $VERSION);
+
+# set version number
+my $VERSION = "SYSTEMIMAGER_VERSION_STRING";
+
+# Make sure proper things are in the path.
+$ENV{PATH} = "/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin";
+
+# Version details
+my $version_info = <<"EOF";
+rsupdateclient (part of Rsyphon) v$VERSION
+
+EOF
+
+$version_info .= Rsyphon::Options->copyright();
+
+# Help stuff
+my $help_info = $version_info . Rsyphon::Options->updateclient_options_header();
+$help_info = $help_info . Rsyphon::Options->generic_options_help_version();
+$help_info = $help_info . Rsyphon::Options->updateclient_options_body();
+$help_info = $help_info . Rsyphon::Options->generic_footer();
+
+my $ARCH = Rsyphon::UseYourOwnKernel::_get_arch();
+
+# Get settings using AppConfig.
+my $config = new AppConfig(
+    'directory' => {ARGCOUNT => 1,},
+    'ssh_user' => {ARGCOUNT => 1},
+    
+    # These are the file system types that will be updated.
+    'fstype' => {ARGCOUNT => 2},
+    
+    'rsync_port' => {ARGCOUNT => 1},
+    'exclude_file' => {ARGCOUNT => 1},
+    'image' => {ARGCOUNT => 1},
+    'server' => {ARGCOUNT => 1},
+    'log' => {ARGCOUNT => 1},
+    
+    # We put bootmodule here so it can be overridden, but we aren't going to 
+    # advertize this yet.
+    # 
+    # this is dependent on flavor, which likely isn't determined yet,
+    # and this location is hardcoded in rcS, so it probably doesn't
+    # make sense to override it.
+    #'bootmodule' => {ARGCOUNT => 1, DEFAULT => "boot/$ARCH"},
+);
+
+# Read in settings from Rsyphon client configuration file
+if(-e "/etc/rsyphon/client.conf") {
+    $config->file("/etc/rsyphon/client.conf");
+}
+
+# Pull some settings from the variables pulled from the config file
+my $exclude_file = $config->exclude_file;
+my $port = $config->rsync_port; 
+
+# Set some vars.
+my $directory;
+my $no_bootloader;
+my $DEVICE;
+
+GetOptions(
+    "configure-from=s"  => \$DEVICE,
+    "help"              => \my $help,
+    "version"           => \my $version,
+    "reboot"            => \my $reboot,
+    "no-bootloader"     => \$no_bootloader,
+    "autoinstall"       => \my $autoinstall,
+    "append=s"          => \my $append_string,
+    "dry-run"           => \my $dry_run,
+    "no-delete"         => \my $no_delete,
+    "ssh-user=s"        => \my $ssh_user,
+    "flavor=s"          => \my $flavor,
+    "server=s"          => \my $server,
+    "image=s"           => \my $image,
+    "override=s"        => \my @overrides,
+    "directory=s"       => \$directory,
+    "log=s"             => \my $log,
+    "yes"               => \my $yes,
+) or die qq($help_info);
+
+# if requested, print version information
+if($version) {
+    version();
+    exit 0;
+}
+
+# if requested, print help
+if($help) {
+    usage();
+    exit 0;
+}
+
+### Now we do option validation testing ###
+# -server and -image must be defined
+#  or -server and -autoinstall
+unless ($server) {
+    print "You must specify --server.\n";
+    get_help();
+    exit(1);
+}
+
+if ($image and $autoinstall) {
+    print "--image and --autoinstall are not compatible options.!\n\n";
+    get_help();
+    exit(1);
+}
+
+if ($DEVICE and ! $autoinstall) {
+    print "--configure-from can only be used with --autoinstall.\n";
+    get_help();
+    exit(1);
+}
+
+# IMAGENAME must not start with a hyphen
+if (($image) and ($image =~ /^-/)) {
+    print "IMAGENAME (specified with --image) can't start with a hyphen.\n";
+    get_help();
+    exit(1);
+}
+
+# IMAGENAME must not start with a hyphen
+if ($server =~ /^-/) {
+    print "HOSTNAME (specified with --server) can't start with a hyphen.\n";
+    get_help();
+    exit(1);
+}
+
+# -autoinstall and -no-bootloader conflict
+if($autoinstall and $no_bootloader) { 
+    print "--autoinstall and --no-bootloader are not compatible options!\n\n";
+    get_help();
+    exit(1);
+}
+
+# -autoinstall and -dry-run conflict
+if($dry_run and $autoinstall) { 
+    print "--autoinstall and --dry-run are not compatible options!\n\n";
+    get_help();
+    exit(1);
+}
+
+# -append not allowed without -autoinstall
+if($append_string and not ($autoinstall)) { 
+    print "--append can be used only with --autoinstall!\n\n";
+    get_help();
+    exit(1);
+}
+
+# -flavor not allowed without -autoinstall
+if($flavor and not ($autoinstall)) { 
+    print "--flavor can be used only with --autoinstall!\n\n";
+    get_help();
+    exit(1);
+}
+
+# -dry-run implies -no-bootloader
+if($dry_run) { $no_bootloader="true"; }
+
+# if not run as root, rsupdateclient will surely fail
+unless($< == 0) {
+    print "FATAL: Must be run as root!\n";
+    exit 1;
+}
+
+
+#
+# Patch provided by Timm. (2006.05.10 -BEF-)
+if (-e "/etc/rsyphon/overrides") {
+    print "WARNING: taking overrides from /etc/rsyphon/overrides!\n";
+    open (FH, "/etc/rsyphon/overrides");
+    while (<FH>) {
+        chomp;
+        push (@overrides, $_);
+    }
+    close (FH);
+}
+
+
+# If we're using SSH, go ahead and establish port forwarding
+if($ssh_user) {
+    # Get a random port number (normal rsync port won't work if rsync daemon is running)
+    my $port_in_use="yes";
+
+    until ( $port_in_use eq "no" ) {
+        $port_in_use="no";
+        $port = int(rand 60000);
+
+        # Be sure port isn't reserved
+        my $file = "/etc/services";
+        open (FILE, "<$file") or croak("$0: Couldn't open $file for reading");
+        while (<FILE>) {
+            if (/$port/) {
+                $port_in_use="yes";
+                next;
+            }
+        }
+        close FILE;
+
+        # Be sure port isn't in use
+        open (NETSTAT, "netstat -tn |");
+        while (<NETSTAT>) {
+            my ($junk, $port_and_junk) = split (/:/);
+            if ($port_and_junk) {
+                my ($netstat_port, $other_junk) = split (/ +/, $port_and_junk);
+                if ($netstat_port = /$port/) {
+                    $port_in_use="yes";
+                    next;
+                }
+            }
+        }
+        close(NETSTAT);
+    }
+
+    # Setup the port forwarding
+    my $command="ssh -f -l $ssh_user -L $port:$server:" . $config->rsync_port . " $server sleep 5";
+    my $rc = 0xffff & system($command);
+    if ($rc != 0) { croak "FATAL: Failed to establish secure port forwarding to $server!"; }  
+
+    # and change imageserver to point to localhost
+    $server = "127.0.0.1";
+
+    # hold the ssh session open until all the transfers are done
+    socket(SOCK, PF_INET, SOCK_STREAM, 0);
+    connect(SOCK, sockaddr_in($port, inet_aton($server)));
+}
+
+### BEGIN update image section ###
+if ($autoinstall) {
+    print
+        "======================= WARNING =================================\n" .
+        " This command will configure this host to be auto re-installed by\n" .
+        " Rsyphon at the next reboot!!!\n" .
+        "======================= WARNING =================================\n" .
+        "\nAre you sure to continue? (y / N)? ";
+    if ($yes) {
+        print "y\n";
+    } else {
+        chomp($_ = <STDIN>);
+        unless ($_ =~ /^y/i) {
+		print "Noting has not been modified...\n";
+		exit(0);
+	}
+    }
+    print "\n";
+
+    my %available_flavors = Rsyphon::Common->get_boot_flavors($ARCH, $server);
+    unless (%available_flavors) {
+        print "\nI couldn't find any boot flavors for Rsyphon on $ARCH.\n";
+        print "Please install the appropriate boot files on $server.\n\n";
+        exit(1);
+    }
+
+    unless ($flavor) {
+        print "Here is a list of available flavors:\n\n";
+        foreach (sort (keys %available_flavors)) {
+            print "  $_\n";
+            $flavor = $_;
+        }
+
+        # If "standard" is one of the available flavours, default to it. -BEF-
+        if ($available_flavors{"standard"}) {
+            $flavor = "standard";
+        }
+        print "\nWhich flavor would you like to use? [$flavor]: ";
+        if ($yes) {
+            print "\n>> Using flavor: $flavor\n";
+        } else {
+            $flavor = Rsyphon::Common->get_response($flavor);
+        }
+    }
+
+    # make sure the specified flavor is available
+    unless ($available_flavors{$flavor}) {
+        print "\nI can't find boot files of the flavor and architecture specified.\n";
+        print "The files you specified would come from a Rsyphon package named:\n\n";
+        print qq( "rsyphon-boot-${ARCH}-${flavor}-${VERSION}"\n\n); 
+        exit(1);
+    }
+
+    # If ia64 and this is *not* a Debian based system, find bootdir using function. -BEF-
+    my $bootdir;
+    my $relative_bootdir;
+
+    if ( ($ARCH eq "ia64") and (( ! -x "/usr/sbin/elilo") and (! -e "/etc/elilo.conf")) ) {
+        $bootdir = Rsyphon::Common->where_is_my_efi_dir();
+        ## $relative_bootdir is the relative path the bootloader uses to
+        ## access boot files.
+        $relative_bootdir = "";
+    } else {
+        $bootdir = "/boot";
+        $relative_bootdir = $bootdir . "/";
+    }
+    my $bootmodule = "boot/$ARCH/$flavor";
+
+    # Suck down kernel.
+    print "Retrieving Rsyphon kernel...\n";
+
+    my $cmd = "rsync -a --numeric-ids rsync://${server}:${port}/${bootmodule}/kernel ${bootdir}/kernel.rsyphon";
+    !system($cmd) or croak("Failed to rsync Rsyphon kernel to ${bootdir} on client!!!");
+
+    # And initial ram disk image.
+    print "Retrieving Rsyphon initial ramdisk...\n";
+
+    $cmd = "rsync -a --numeric-ids rsync://${server}:${port}/${bootmodule}/initrd.img ${bootdir}/initrd.img.rsyphon";
+    !system($cmd) or croak("Failed to rsync Rsyphon initrd.img to $bootdir on client!!!");
+
+    # find out on which partition the current root file system resides
+    my $file = "/etc/mtab";
+    open(MTAB, "< $file") or croak("Couldn't open $file for reading!");
+    my $rootdev = "";
+    my $bootdev = "";
+    while (<MTAB>) {
+        # turn tabs into spaces and gets rid of duplicates
+        s/\s+/ /g;
+        # find the last root device
+        if(/^(\S+) \/ /){
+            $rootdev = $1;
+        }
+        # find the last boot device
+        if(/^(\S+) $bootdir /){
+            $bootdev = $1;
+        }
+    }
+    close(MTAB);
+
+    unless ($bootdev) {
+        $bootdev = $rootdev;
+    }
+
+    # If -configure-from DEVICE was specified, then do so. -BEF-
+    if ($DEVICE) {
+        create_local_cfg($DEVICE);
+    }
+
+    # Only use LAST_ROOT if "/local.cfg" exists.
+    my $last_root;
+    if ( -f "/local.cfg" ) {
+        $last_root = $rootdev;
+
+        print "I found a local.cfg file in your hard drive's root filesystem (/local.cfg),\n";
+        print "so I will tell the autoinstall client to mount $last_root, and read the\n";
+        print "local.cfg file during autoinstall.\n";
+        print "\n";
+        print "Your kernel must have all necessary block and filesystem drivers compiled in\n";
+        print "statically \(not modules\) in order to use a local.cfg on your hard drive.  The\n";
+        print "standard Rsyphon kernel is modular, so you will need to compile your own\n";
+        print "kernel.  See the Rsyphon documentation for details.\n";
+        print "\n";
+        print "If you don't want to compile your own kernel, but need to use a local.cfg file,\n";
+        print "you can use one on a floppy with the standard Rsyphon kernel.\n";
+
+    }
+
+    # Create append arguments
+    my $append = '';
+    if ($append_string) {
+        $append .= $append_string;
+    }
+    if ($append !~ /ramdisk_blocksize/) {
+        $append .= " ramdisk_blocksize=1024";
+    }
+    if (($last_root) and ($append !~ /LAST_ROOT/)) {
+        $append .= " LAST_ROOT=$last_root";
+    }
+    unless (($last_root) or ($DEVICE) or ($append =~ /LAST_ROOT/)) {
+        $append .= " SKIP_LOCAL_CFG=y";
+    }
+
+    ### BEGIN autoinstall boot configuration ###
+    $cmd = <<SC_EOF;
+systemconfigurator --verbose --configboot --runboot --stdin <<EOF
+[BOOT]
+BOOTDEV = $bootdev
+ROOTDEV = /dev/ram
+TIMEOUT = 50
+DEFAULTBOOT = Rsyphon
+
+[KERNEL0]
+LABEL = Rsyphon
+PATH = ${relative_bootdir}kernel.rsyphon
+INITRD = ${relative_bootdir}initrd.img.rsyphon
+APPEND = $append
+EOF
+
+SC_EOF
+
+    print "Using System Configurator to set boot configuration...";
+    !system($cmd) or croak("systemconfigurator command to configure autoinstall boot failed!");
+    print "Done!\n";
+    ### END autoinstall boot configuration ###
+
+} else {
+
+    # go ahead and do that update thing you do
+
+    # In case directory doesn't already have one, add a trailing slash
+    # (We could easily test to see if it does, but we've got to normalize multiple
+    #  slashes into one down below anyway...  Same number of functions to execute.)
+    $directory = $directory . '/';
+
+    # turn multiple slashes "//" into a single slash "/"
+    # (So maybe we don't really have to do this -- things will work with multiple
+    #  slashes.  This is actually done to avoid user consternation when reading
+    #  any output that might include the multiple slashes.)
+    $directory =~ s(/+)(/)g;
+
+
+    # Try to detect the image and the overrides to retrieve, according to the
+    # cluster configuration defined by rsclusterconfig(8) on the image server.
+    my $hostname = hostname();
+    $hostname =~ s/\..*//g;
+    unless ($hostname) {
+        print STDERR "error: couldn't get hostname to evaluate a target image!\n";
+        print STDERR "Try to specify --image and/or --override from command line.\n";
+        exit(1);
+    }
+    unless ($image) {
+        my $tmpfile = tmpnam();
+        my $cmd = "rsync rsync://${server}:${port}/scripts/cluster.txt $tmpfile";
+        unless (!system($cmd)) {
+            print STDERR "error: couldn't retrieve rsync://${server}:${port}/scripts/cluster.txt from the image server!\n";
+            print STDERR "Remember to start rsyphon-server-rsyncd on your image server ($server).\n";
+            unlink($tmpfile);
+            exit(1);
+        }
+        chomp($image = `grep "^$hostname:" $tmpfile | cut -d: -f3 | grep -v '^[[:space:]]*\$' | sed -ne '1p'`);
+        unless ($image) {
+            print STDERR "error: couldn't find a valid image for: $hostname!\n";
+            print STDERR "Try to specify --image and/or --override from command line.\n";
+            unlink($tmpfile);
+            exit(1);
+        }
+        unless (@overrides) {
+            push(@overrides, split(/\s+/, `sed -ne 's/^# global_override=:\\([^:]*\\):\$/\\1/p' $tmpfile`));
+            push(@overrides, reverse split(/\s+/, `grep "^$hostname:" $tmpfile | cut -d: -f4 | tr "\n" ' '`));
+        }
+        unlink($tmpfile);
+    }
+
+    print
+        "======================= WARNING =================================\n" .
+        " This command will update this host with the image: $image \n" .
+        " and overrides (in order of importance):\n\n" .
+	" " . join(', ', reverse @overrides) . "\n\n";
+    print
+        " Some files could be " . ($no_delete ? '' : "deleted or ") . "overwritten, so probably it is a\n" .
+        " good idea to run this command with --dry-run before and stop the\n" .
+        " production on this host.\n" unless ($dry_run);
+    print
+        "======================= WARNING =================================\n" .
+        "\nAre you sure to continue? (y / N)? ";
+    if ($yes) {
+        print "y\n";
+    } else {
+        chomp($_ = <STDIN>);
+        unless ($_ =~ /^y/i) {
+            print "Noting has not been modified...\n";
+            exit(0);
+        }
+    }
+    print "\n";
+    
+    # start with base command
+    my $cmdopts  = "";
+
+    if ($dry_run) {
+        $cmdopts .= ' --dry-run';
+    }
+    if ($log) {
+        $cmdopts .= ' --log-format="' . $log . '"';
+    }
+
+    # Exclude lost+found directories.  With dynamic partitioning, the same 
+    # image may be used on clients with different partition schemes, and 
+    # therefore mount points. -BEF-
+    #
+    print "Excluding (automatically): lost+found/\n";
+    $cmdopts .= " --exclude=lost+found/";
+
+    # Automatically exclude /dev if udev or devfs is detected. -AR-
+    if (Rsyphon::Common->which_dev_style() ne 'static') {
+        print "Excluding (automatically): /dev/\n";
+        $cmdopts .= " --exclude=/dev/";
+    }
+
+    # Get exclusions from client side exclusion file.  Only use exclusions that start with the 
+    # directory specified with -directory.  
+    #
+    # Because rsync exclusions must be relative to the root of the directory being copied, strip 
+    # off the specified -directory from the beginning of each exclusion path. -BEF
+    #
+    open(SYSTEMIMAGER_EXCLUDE, "<$exclude_file") or croak("Couldn't open $exclude_file for reading!");
+    while (<SYSTEMIMAGER_EXCLUDE>) {
+      if (m|^\s*$directory|) {  # match non commented explicit path
+        chomp;
+        s|^$directory|/|;
+        print "Excluding (from $exclude_file): $_\n";
+        $cmdopts .= " --exclude=$_";
+      }
+    }
+    close(SYSTEMIMAGER_EXCLUDE);
+
+    # Append currently mounted non supported filesystems to exclusions list.
+    # ( $config-fstype() returns a reference to an array.  We store that in
+    #   $fstypes, and get at the array by using @$fstypes. )
+    my $fstypes = $config->fstype();
+    my $fsregex = '^(' . (join '|', @$fstypes) . ')$'; # We are compiling a regex here
+
+    open(ETC_MTAB, "</etc/mtab") or croak("Couldn't open /etc/mtab for reading!");
+    while (<ETC_MTAB>) {
+        my ($device, $mount, $fstype, $garbage) = split(/\s+/,$_);
+        if($fstype !~ /$fsregex/o) { # The /o makes the regex compile once. This is for performance
+            print "Excluding (filesystem $fstype): $mount\n";
+            $cmdopts .= " --exclude=$mount";
+        }
+    }
+    close(ETC_MTAB);
+
+    my $cmd = "";
+    my $imagepass = 1;  ## Set this flag so we know whether we're syncing
+                        ## the image or we're onto the overrides
+    foreach my $module ($image, @overrides) {
+        ## leave this off unless we're doing the image
+        my $delete = "";
+        my $rsyncopt = "-aIv";
+
+        # finalize command
+        if ($imagepass) {
+            ## if we're doing the rsync of the image, go ahead and delete
+            ## files that aren't on the server side
+            $delete = "--delete" unless ($no_delete);
+            $imagepass = 0;
+            $rsyncopt = "-av";
+        }
+        else {
+            $module = "overrides/$module";
+        }
+        $cmd = "rsync $rsyncopt --numeric-ids $delete $cmdopts rsync://${server}:${port}/${module}${directory} ${directory}";
+
+        # execute command
+        if ($dry_run) {
+            print ">> Performing a dry run -- no files will be modified...\n";
+        }
+        print ">> Updating image from module ${module}...\n";
+
+        # Run the command. -BEF-
+        unless (!system($cmd)) {
+            
+            #
+            # $cmd must have failed...
+            #
+            if ($image eq $module) {
+                die "$cmd failed!";
+            } else { 
+                warn "$cmd failed, continuing...";
+            }
+        }
+    }
+
+    close(SOCK) if ($ssh_user);
+    
+    # Now we install the bootloader if requested
+    unless($no_bootloader) {
+        print "Running bootloader...";
+        my $cmd = "systemconfigurator --runboot";
+        !system($cmd) or die "$cmd failed!";
+        print " done!\n";
+    }
+} ### END update image section ###
+
+
+### BEGIN graffiti ###
+if(defined $image) {
+    unless( defined($dry_run) ) {
+        my $file = "/etc/rsyphon/IMAGE_LAST_SYNCED_TO";
+        open (FILE, ">$file") or croak("Couldn't open $file for writing!");
+            print FILE $image, "\n";
+        close (FILE);
+    }
+}
+### END graffiti ###
+
+# --reboot
+if(defined $reboot) {
+    print "Rebooting...\n";
+    my $cmd = "/bin/sleep 10s; /sbin/init 6";
+    !system($cmd) or die "$cmd failed!";
+}
+
+### BEGIN Subroutines ###
+sub version {
+    print qq($version_info);
+}
+
+sub get_help {
+    print qq(  Try "rsupdateclient --help" for more information.\n);
+}
+
+sub usage {
+    print qq($help_info);
+}
+
+sub dec2bin {
+    my $str = unpack("B32", pack("N", shift));
+    return $str;
+}
+
+sub dec2bin8bit {
+    my $str = unpack("B32", pack("N", shift));
+    $str = substr($str, -8); # 32bit number -- get last 8 bits (the relevant ones)
+    return $str;
+}
+
+sub bin2dec {
+    return unpack("N", pack("B32", substr("0" x 32 . shift, -32))); # get all 32bits
+}
+
+sub ip_quad2ip_bin {
+    (my $a, my $b, my $c, my $d) = split(/\./, $_[0]);
+    my $a_bin=dec2bin8bit($a);
+    my $b_bin=dec2bin8bit($b);
+    my $c_bin=dec2bin8bit($c);
+    my $d_bin=dec2bin8bit($d);
+    return join('', $a_bin, $b_bin, $c_bin, $d_bin);
+}
+
+sub ip_bin2ip_quad {
+    my $ip_bin = $_[0];
+    my $a_dec = bin2dec(substr($ip_bin, 0, 8));
+    my $b_dec = bin2dec(substr($ip_bin, 8, 8));
+    my $c_dec = bin2dec(substr($ip_bin, 16, 8));
+    my $d_dec = bin2dec(substr($ip_bin, 24, 8));
+    return join('.', $a_dec, $b_dec, $c_dec, $d_dec);
+}
+
+
+# Usage: 
+# create_local_cfg ($DEVICE);
+sub create_local_cfg {
+
+    my $DEVICE = shift;
+
+    my $hostname = hostname();
+    $hostname =~ s/\..*//g;
+
+    my %netvars = (
+        GATEWAYDEV => $DEVICE,
+        GATEWAY => '',
+        IPADDR => '',
+        BROADCAST => '',
+        NETMASK => '',
+        NETWORK => '',
+        HOSTNAME => $hostname,
+        DOMAINNAME => '',
+        DEVICE => $DEVICE,
+        IMAGESERVER => $server,
+        SSH_USER => $ssh_user
+    );
+
+    ### BEGIN get ip address, netmask, and broadcast from the ifconfig command ###
+    my $command = "ifconfig $netvars{DEVICE}";
+    open(COMMAND, "$command|");
+    while (<COMMAND>) {
+        if (/inet addr/) {
+            s/[A-Za-z:]//g;
+            s/^ +//g;
+            chomp;
+            ($netvars{IPADDR}, $netvars{BROADCAST}, $netvars{NETMASK}) = split(/ +/);
+        }
+    }
+    close(COMMAND);
+    ### END get ip address, netmask, and broadcast from the ifconfig command ###
+
+    ### BEGIN get interface and gateway from the route command ###
+    my $routecmd = "route -n";
+    open(COMMAND, "$routecmd|");
+    while (<COMMAND>) {
+        if ((/$netvars{DEVICE}/) and (/UG/)) {
+            my ($destination, $gateway, $garbage) = split(/\s+/,$_);
+            $netvars{GATEWAY} = $gateway;
+        }
+    }
+    close(COMMAND);
+    ### END get interface and gateway from the route command ###
+
+    ### BEGIN get ip address of imageserver if necessary ###
+    if($netvars{IMAGESERVER} =~ /[A-Za-z]/) {
+        $netvars{IMAGESERVER} = inet_ntoa(scalar gethostbyname($netvars{IMAGESERVER}));
+    }
+    ### END get ip address of imageserver if necessary ###
+
+    ### BEGIN get domainname ###
+    # Make reasonable attempt to get domainname by looking in resolv.conf
+    my $file="/etc/resolv.conf";
+    if(-e $file) {
+      open(FILE, "<$file") or die ("Can't open $file for reading!");
+        while(<FILE>) {
+          if(/^search/) {
+            (my $junk, $netvars{DOMAINNAME}) = split;
+          }
+        }
+      close(FILE);
+    }
+
+    # if resolv.conf didn't work, try dnsdomainname
+    unless($netvars{DOMAINNAME}) {
+        my $cmd = "dnsdomainname 2>&1";
+        $netvars{DOMAINNAME} = qx/$cmd/;
+        chomp $netvars{DOMAINNAME};
+        $_ = $netvars{DOMAINNAME};
+        if(/s+/) {
+            $netvars{DOMAINNAME}="";
+        }
+    }
+    ### END get domainname ###
+
+    ### BEGIN Calculate network number ###
+    my $IPADDR_BIN  = ip_quad2ip_bin($netvars{IPADDR});
+    my $NETMASK_BIN = ip_quad2ip_bin($netvars{NETMASK});
+    my $NETWORK_BIN = $IPADDR_BIN & $NETMASK_BIN;
+    $netvars{NETWORK} = ip_bin2ip_quad($NETWORK_BIN);
+    ### END Calculate network number ###
+
+
+    ### BEGIN Create local.cfg ###
+    my $localfile = "/local.cfg";
+    open(FILE, ">$localfile") or croak("Couldn't open $localfile for writing!");
+    print FILE <<EOF;
+#
+# "Rsyphon" 
+#
+#  Copyright (C) 1999-2001 Brian Elliot Finley <brian.finley\@baldguysoftware.com>
+#  Copyright (C) 2001-2002 Bald Guy Software <brian.finley\@baldguysoftware.com>
+#
+# This file is: /local.cfg
+#
+EOF
+
+    # And now we loop through our hash and dump out the variables
+    foreach my $var (sort keys %netvars) {
+      if($netvars{$var}) {
+        print FILE "$var=$netvars{$var}\n";
+      } else {
+        print FILE "$var=\n";
+      }
+    }
+
+    close(FILE);
+    ### END Create local.cfg ###
+
+
+    ### BEGIN show file to user ###
+    print qq(\n);
+    print qq(<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n);
+    print qq(    Below are the contents of your /local.cfg file.  Make sure that all the \n);
+    print qq(    variables are filled in and that they contain the proper values.  You \n);
+    print qq(    may edit the file directly if you need to change any of the values.\n);
+    print qq(<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n);
+    print qq(\n);
+
+    $file = "/local.cfg";
+    open(FILE, "<$file") or croak("Couldn't open $file for reading.");
+        while (<FILE>) { print; }
+    close(FILE);
+    ### END show file to user ###
+}
+### END Subroutines ###
+
+exit 0;

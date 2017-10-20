@@ -1,0 +1,263 @@
+<refentryinfo>
+  <address>
+    &dhemail;
+  </address>
+  <author>
+    &dhfirstname;
+    &dhsurname;
+  </author>
+  <copyright>
+    <year>2002</year>
+    <holder>&dhusername;</holder>
+  </copyright>
+    &dhdate;
+</refentryinfo>
+
+<refmeta>
+  <refentrytitle>RS_UPDATECLIENT</refentrytitle>
+    &dhsection;
+  </refmeta>
+  <refnamediv>
+    <refname>rsupdateclient</refname>
+
+    <refpurpose>
+      update the image running on the local client machine to match that of an
+      image on an image server
+    </refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>rsupdateclient</command>
+
+      <arg><option>--help</option></arg>
+      <arg><option>--version</option></arg>
+      <arg><option>--server <replaceable>HOSTNAME</replaceable></option></arg>
+      <arg><option>--image <replaceable>IMAGENAME</replaceable></option></arg>
+      <arg rep="repeat"><option>--override <replaceable>OVERRIDE</replaceable></option></arg>
+      <arg><option>--directory <replaceable>DIRECTORY</replaceable></option></arg>
+      <arg><option>--no-bootloader</option></arg>
+      <arg><option>--autoinstall</option></arg>
+    <arg><option>--flavor <replaceable>FLAVOR</replaceable></option></arg>
+      <arg><option>--configure-from <replaceable>DEVICE</replaceable></option></arg>
+      <arg><option>--ssh-user <replaceable>USERNAME</replaceable></option></arg>
+      <arg><option>--reboot</option></arg>
+      <arg><option>--dry-run</option></arg>
+      <arg><option>--log <replaceable>"STRING"</replaceable></option></arg>
+      <arg><option>--yes</option></arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>DESCRIPTION</title>
+
+    <para>
+      This manual page documents briefly the <command>rsupdateclient</command>
+      command.
+    </para>
+
+    <para>
+      <command>rsupdateclient</command> is a program that brings the local
+      client's image up to date with an image on a image server.
+    </para>
+
+  </refsect1>
+  <refsect1>
+    <title>OPTIONS</title>
+
+    <para>A summary of options is included below.</para>
+
+    <variablelist>
+      <varlistentry>
+        <term><option>--help</option>
+        </term>
+        <listitem>
+          <para>Show summary of options</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--version</option>
+        </term>
+        <listitem>
+          <para>Display version and copyright information</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--server <replaceable>HOSTNAME</replaceable></option></term>
+        <listitem>
+          <para>
+	    Hostname or IP address of the imageserver.  Replaces deprecated
+	    <option>--imageserver</option> option.
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--image <replaceable>IMAGENAME</replaceable></option></term>
+        <listitem>
+	  <para>
+		Image from which the client should be updated. If not specified
+		it will be used the image defined on the image server by
+		<command>rsclusterconfig(8)</command>.
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--override <replaceable>OVERRIDE</replaceable></option></term>
+        <listitem>
+          <para>Override module(s) from which to copy additional files.  
+            Override directories are useful when you have multiple types of
+            clients that share a subset of files.  The image can contain this
+            subset, and you can have an override module for each client type
+            which contains the additional files required for that client type.
+            If the same file exists in an override module and the image, the
+            files in the override module will overwrite those in the image.
+          </para>
+          <para>
+	    You can specify multiple override modules.  They will be copied 
+            over in the same order the are specified on the command line.
+          </para>
+          <para>
+	    If not specified it will be used the list of overrides defined on
+            the image server by <command>rsclusterconfig(8)</command>.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--directory <replaceable>DIRECTORY</replaceable></option></term>
+        <listitem>
+          <para>
+	    Absolute path of the directory to be updated (defaults to "/")
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--no-bootloader</option></term>
+        <listitem>
+          <para>
+	    Don't run the bootloader (lilo, elilo, grub, etc) after update
+	    completes.  (<command>rsupdateclient</command> always runs the
+	    bootloader unless specified).
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--autoinstall</option>
+        </term>
+        <listitem>
+          <para>
+	  Autoinstall this client the next time it reboots.  This option must
+	  be used if you want your partition scheme to be updated to match
+	  the partition scheme of the image you are updating too.  This is
+	  required if the partition scheme of the image you are updating from
+	  differs from the partition scheme of the image you are currently
+	  running, as your system may be left unbootable otherwise.
+	  This option conflicts with <option>--nolilo</option>.
+	</para>
+	<para>
+	  Updates that use this option cannot take advantage of rsync's
+	  efficient updating mechanism.  This process also requires two
+	  reboots.  This makes <option>--autoinstall</option> updates more
+	  consuming.
+	</para>
+        </listitem>
+      </varlistentry>
+    <varlistentry>
+      <term><option>--flavor <replaceable>FLAVOR</replaceable></option></term>
+      <listitem>
+	<para>
+	  The boot flavor to be used for doing an autoinstall 
+	  (only valid with -autoinstall).
+	</para>
+      </listitem>
+    </varlistentry>
+      <varlistentry>
+        <term><option>--configure-from <replaceable>DEVICE</replaceable></option></term>
+        <listitem>
+          <para>
+	    Only used with -autoinstall.  Stores the network configuration
+	    for DEVICE in the /local.cfg file so that the same settings will be
+	    used during the autoinstall process.
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--ssh-user <replaceable>USERNAME</replaceable></option></term>
+        <listitem>
+          <para>
+	    Username for ssh connection from the client.  Only needed if a
+	    secure connection is required.
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--reboot</option>
+        </term>
+        <listitem>
+          <para>Reboot client after update completes.</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--dry-run</option>
+        </term>
+        <listitem>
+          <para>
+	    Don't actually modify anything, just show what would be done.
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--no-delete</option>
+        </term>
+        <listitem>
+          <para>
+	    Don't delete any file on the client. Only download new files
+            and update the files that already exist.
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--log <replaceable>STRING</replaceable></option></term>
+	<listitem>
+	  <para>
+	    Quoted string for log file format.  See the
+	    <filename>rsyncd.conf</filename>(5) man page for options.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--yes</option></term>
+	<listitem>
+	  <para>
+	    Answer yes to all questions.
+	  </para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+  <refsect1>
+    <title>SEE ALSO</title>
+
+    <para>
+      <command>rspushupdate</command>(8),
+      <command>rslsimage</command>(8),
+      <command>rsclusterconfig</command>(8),
+      <command>rspushoverrides</command>(8)
+    </para>
+
+    <para>More details can be found in the <citetitle>Rsyphon
+	manual.</citetitle>
+    </para>
+  </refsect1>
+  <refsect1>
+    <title>AUTHOR</title>
+
+    <para>This manual page was compiled by &dhusername; <&dhemail;> for
+      the &debian; system (but may be used by others).</para>
+
+    <!-- <para>Permission is granted to copy, distribute and/or modify
+      this document under the terms of the <acronym>GNU</acronym> Free
+      Documentation License, Version 1.1 or any later version
+      published by the Free Software Foundation; with no Invariant
+      Sections, no Front-Cover Texts and no Back-Cover Texts.  A copy
+      of the license can be found under
+      <filename>/usr/share/common-licenses/FDL</filename>.</para> -->
+
+  </refsect1>

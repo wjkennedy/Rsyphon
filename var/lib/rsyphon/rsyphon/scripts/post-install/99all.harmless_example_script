@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# $Id$
+#
+
+echo 
+echo "I live in /var/lib/rsyphon/scripts/post-install."
+echo "See: /var/lib/rsyphon/scripts/post-install/README for details."
+echo 
+

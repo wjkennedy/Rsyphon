@@ -1,0 +1,553 @@
+<chapter>
+  <title>Developing Rsyphon<superscript>&#174;</superscript></title>
+  <section>
+    <title>Design Goals</title>
+    <para>
+      The design goal for Rsyphon was to create a tool that was both easy
+      and fast to use, allowing system administrators to perform incremental
+      upgrades that minimized system disruptions and provided software
+      independent of any packaging system.  The specific requirements follow:
+    </para>
+    <itemizedlist>
+      <listitem>
+	<para>
+	  Images should be pulled from a working system.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  Unattended installs are a must.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  The unattended install system has to be able to repartition the 
+	  destination drive(s).
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  System administrators who don't completely understand the tool should
+	  be able to use it.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  The install should be easy and quick so that it can be useful
+	  immediately without a lot of site-specific customization.  
+	</para>
+      </listitem>
+      
+	<listitem>
+	<para>
+	  Images should be stored as normal files to allow for incremental
+	  upgrades, as opposed to "dd" style block level images of physical 
+	  disks.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  The Rsyphon software should be independent of any and all
+	  packaging systems (such as RPM) in order to easily accommodate
+	  different distributions.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  Rsyphon should be able to store multiple images for different
+	  types of systems and for revision control.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  A mechanism should be available to let unattended install clients
+	  know which image to install. 
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  An installed client  should be able to update itself to a new or
+	  modified image.
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  Rsyphon should have a command line interface that can easily be
+	  wrapped with a GUI.
+	</para>
+      </listitem>
+      
+    </itemizedlist>
+  </section>
+  <section>
+    <title>Development of Rsyphon Architecture</title>
+    <para>
+      Minimal system requirements were a top priority for Rsyphon, which
+      began as a series of utilities written as shell scripts.  However, shell
+      scripts were inadequate as Rsyphon matured and its utilities became
+      more complex.  Perl, part of most Linux installs and possessing minimal system
+      requirements, then replaced shell scripts.  Using Perl, developers have
+      been able to generate cleaner, more advanced code.
+    </para>
+    
+    <para>
+      Rsyphon architecture was designed to be open to modification at
+      every level.  The protocol for transferring files during installs
+      and updates is currently <filename>rsync(1)</filename>, but the modular
+      code easily allows drop-in replacements as is appropriate.  All unicast
+      file transfer mechanisms, including <filename>rsync(1)</filename> are 
+      implemented in a "pull" fashion, which is generally considered to be 
+      superior to a "push," because it is much easier to monitor the state of 
+      the receiving system prior to and during the file transfers.
+    </para>
+  </section>
+  
+  <section>
+    <title>Versioning</title>
+    <para>
+    Rsyphon releases use an "A.B.C.D" numbering scheme similar to that
+    used by the Linux kernel.
+    </para>
+    <section>
+      <title>Synopsis</title>
+      <para>
+      VERSION.MAJOR.MINOR[.EXTRAVERSION]
+      </para>
+    </section>
+    <section>
+      <title>Official release</title>
+      <para>
+          <itemizedlist>
+	    <listitem>
+	      <para>
+	      Rsyphon official releases are denoted using a standard
+	      triplet of integers: <emphasis>VERSION.MAJOR.MINOR</emphasis>.
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+	      The basic intent is that a <emphasis>VERSION</emphasis> increment
+	      indicates a major architectural change, a
+	      <emphasis>MAJOR</emphasis> increment indicates major improvements
+	      and a <emphasis>MINOR</emphasis> increment indicates a bug fix
+	      release or a release with minor improvements.
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+              An odd <emphasis>MAJOR</emphasis> number indicates an unstable
+              release, an even number indicates a stable release.
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+              An odd <emphasis>MINOR</emphasis> number indicates a pre-release
+              or a release candidate (see  below) of the
+              <emphasis>VERSION.MAJOR.(MINOR + 1)</emphasis>, an even number
+              always indicates an official release (stable or unstable,
+              depening on the <emphasis>MAJOR</emphasis> number).
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+	      A pre-release is always considered unstable, even if
+	      <emphasis>MAJOR</emphasis> is a even number.
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+              Official releases are always distributed uploading the files
+              and packages via the
+              <ulink url="http://sourceforge.net/project/showfiles.php?group_id=259">SourceForge file release system</ulink>. 
+	      </para>
+	    </listitem>
+          </itemizedlist>
+      </para>
+    </section>
+    <section>
+      <title>Development pre-release</title>
+      <para>
+          <itemizedlist>
+	    <listitem>
+	      <para>
+              Development pre-release or release candidate versions use an
+              additional integer at the end of the version string:
+              <emphasis>VERSION.MAJOR.MINOR.EXTRAVERSION</emphasis>. By
+              definition the <emphasis>EXTRAVERSION</emphasis> number can
+              be appended only if the <emphasis>MINOR</emphasis> number is
+              odd (pre-release or releaes candidate).
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+              The first 3 numbers (<emphasis>VERSION</emphasis>,
+              <emphasis>MAJOR</emphasis> and <emphasis>MINOR</emphasis>)
+              define the version of the next official release, that will be
+              called: <emphasis>VERSION.MAJOR.(MINOR + 1)</emphasis>.
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+              <emphasis>EXTRAVERSION</emphasis> should always contain the
+              string <emphasis>svnNUMBER</emphasis>, where
+              <emphasis>NUMBER</emphasis> is a reference to the original SVN
+              version (checked into http://svn.rsyphon.org). By default
+              a pre-release is always based on the exact content of the SVN
+              branch <emphasis>MAJOR.MINOR.x</emphasis>. Otherwise an
+              additional comment, string, abbreviation, etc. must be appended,
+              that can identify for example:
+              <itemizedlist>
+	        <listitem>
+	          <para>
+                  the name of the developer (i.e.
+                  <emphasis>.svn4040arighi</emphasis>),
+	          </para>
+	        </listitem>
+	        <listitem>
+	          <para>
+                  an explicative name of a new feature present only in the
+                  local repository of a developer (i.e.
+                  <emphasis>svn3636bittorrent</emphasis>),
+ 	          </para>
+	        </listitem>
+	        <listitem>
+	          <para>
+                  a name that identify the origin of the source repository
+                  (i.e. <emphasis>.svn3636trunk</emphasis>,
+                  <emphasis>.svn3636udevbranch</emphasis>, etc.).
+ 	          </para>
+	        </listitem>
+	      </itemizedlist>
+	      </para>
+	    </listitem>
+          </itemizedlist>
+      </para>
+    </section>
+    <section>
+      <title>Examples</title>
+      <para>
+          <itemizedlist>
+	    <listitem>
+	      <para>
+	      Stable mainline:
+              <itemizedlist>
+	        <listitem>
+	          <para>
+	          <emphasis>3.8.0</emphasis>
+	          </para>
+	        </listitem>
+	        <listitem>
+	          <para>
+	          <emphasis>3.8.2</emphasis>
+	          </para>
+	        </listitem>
+	        <listitem>
+	          <para>
+	          <emphasis>3.8.4</emphasis>
+	          </para>
+	        </listitem>
+	        <listitem>
+	          <para>
+	          ...
+	          </para>
+	        </listitem>
+	      </itemizedlist>
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+	      Unstable:
+              <itemizedlist>
+	        <listitem>
+	          <para>
+	          <emphasis>3.9.0</emphasis>
+	          </para>
+	        </listitem>
+	        <listitem>
+	          <para>
+	          <emphasis>3.9.2</emphasis>
+	          </para>
+	        </listitem>
+	        <listitem>
+	          <para>
+	          <emphasis>3.9.4</emphasis>
+	          </para>
+	        </listitem>
+	        <listitem>
+	          <para>
+	          ...
+	          </para>
+	        </listitem>
+	      </itemizedlist>
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+	      Pre-release:
+              <itemizedlist>
+	        <listitem>
+	          <para>
+	          <emphasis>3.9.1.svn4100</emphasis> = pre-release of 3.9.2
+	          (based on SVN version 4100)
+	          </para>
+	        </listitem>
+	        <listitem>
+	          <para>
+	          <emphasis>3.8.3.svn4300</emphasis> = pre-release of 3.8.4
+	          (based on SVN version 4300)
+	          </para>
+	        </listitem>
+	        <listitem>
+	          <para>
+	          <emphasis>3.9.5.svn5136veryexperimentalfeature</emphasis> =
+	          pre-release of 3.9.6 (based on SVN version 5136 + adds the
+	          new cool "veryexperimentalfeature" that is not yet checked in
+	          the svn repository)
+	          </para>
+	        </listitem>
+	        <listitem>
+	          <para>
+                  <emphasis>3.8.5.svn5050arighi</emphasis> = pre-release of
+                  3.8.6 (based on SVN version 5050 + customizations added by
+                  the developer arighi, not yet checked in the svn repository)
+	          </para>
+	        </listitem>
+	      </itemizedlist>
+	      </para>
+	    </listitem>
+	  </itemizedlist>
+      </para>
+    </section>
+  </section>
+
+  <section>
+    <title>Using SVN</title>
+    <para>
+      Rsyphon is maintained in SVN at
+      <ulink url="http://svn.rsyphon.org">http://svn.rsyphon.org</ulink>.
+      To easily submit patches for future releases, it's strongly suggested
+      to generate them against the code in SVN (see also the submitting patches
+      section below). There are typically three active branches at any given
+      time: the current stable branch, the current unstable branch and the
+      development branch (called <emphasis>trunk</emphasis>). If you are
+      fixing a bug that exists in the current stable release, generate a patch
+      against the stable branch. If you are adding a new feature or fixing a
+      bug that is only in the unstable or development branch, use the trunk.
+    </para>
+    <para>
+      Instructions for accessing the SVN repository can be found at
+      <ulink url="http://svn.rsyphon.org">
+      http://svn.rsyphon.org
+      </ulink>.
+    </para>
+  </section>
+
+  <section>
+    <title>Submitting Patches</title>
+    <para>
+      Following are suggested guidelines for submitting packages for a future
+      release that make it easier to incorporate the changes.
+    </para>
+    <section>
+      <title>Select e-mail destination</title>
+      <para>
+      Always send your patches to
+      <ulink url="mailto:sisuite-devel@lists.sourceforge.net">sisuite-devel@lists.sourceforge.net</ulink>.
+      </para>
+    </section>
+    <section>
+      <title>Separate logical changes</title>
+      <para>
+      If your changes include multiple bug fixes and performance enhancements,
+      separate those changes into two or more patches. On the other hand, if
+      you make a single change to numerous files, group those changes into a
+      single patch. Thus a single logical change is contained within a single
+      patch. If one patch depends on another patch in order for a change to be
+      complete, that is OK. Simply note "this patch depends on patch X" in your
+      patch description. If you cannot condense your patch set into a smaller
+      set of patches, then only post say 15 or so at a time and wait for review
+      and integration. 
+      </para>
+    </section>
+    <section>
+      <title>Email subject format</title>
+      <para>
+      Use the following template for the subject of your email with a patch:
+      <programlisting>
+      [PATCH] one-line summary
+      </programlisting>
+      Where "one-line summary" summarizes the change the patch makes. This
+      summary is copied directly into the svn changelog, so make sure that
+      your summary is descriptive. "update to latest SVN" or "fix bug" is not
+      specific enough about what portion of the code is being modified.
+      </para>
+      <para>
+      Keep your overall subject line under 65 characters or so. 
+      </para>
+    </section>
+    <section>
+      <title>Email body contents: description</title>
+      <para>
+      At the beginning of your email, use as many lines as you wish to describe
+      the patch. This text is copied directly into the SVN changelog. Be as
+      specific as possible. The <emphasis>WORST</emphasis> descriptions possible
+      include things like "update Server.pm", "bug fix for Server.pm", or
+      "this patch includes updates for the server side. Please apply."
+      </para>
+      <para>
+      If your description starts to get too long, that's a sign that you
+      probably need to split up your patch. Include comments you don't wish to
+      be in the SVN changelog following a "---" terminator line. The terminator
+      must be on a line by itself. 
+      </para>
+    </section>
+    <section>
+      <title>Name your Rsyphon version</title>
+      <para>
+      It is important to note, either in the subject line or in the patch
+      description, the Rsyphon version to which this patch applies.
+      If the patch does not apply cleanly to the latest Rsyphon version,
+      it will reduce the chances of your change being accepted. 
+      </para>
+    </section>
+    <section>
+      <title>Email body contents: patch</title>
+      <para>
+      Always uses "diff -urN" to create patches. When creating your patch,
+      make sure to create it in "unified diff" format, as supplied by the '-u'
+      argument to diff(1).
+      </para>
+      <para>
+      Patches should be based in the root Rsyphon source directory, not in
+      any lower subdirectory.
+      </para>
+      <para>
+      To create a patch for a single file, it is often sufficient to do:
+      <programlisting>
+       SRCTREE=rsyphon-3.9.6
+       MYFILE=lib/Rsyphon/Server.pm
+       cd $SRCTREE
+       cp $MYFILE $MYFILE.orig
+       vi $MYFILE      # make your change
+       cd ..
+       diff -u $SRCTREE/$MYFILE{.orig,} > /tmp/patch
+      </programlisting>      
+      </para>
+      <para>
+      To create a patch for multiple files, you should unpack a "vanilla", or
+      unmodified Rsyphon source tree, and generate a diff against your own
+      source tree. For example:
+      <programlisting>
+       MYSRC=/devel/rsyphon-3.9.6
+
+       tar xvjf rsyphon-3.9.6.tar.bz2
+       mv rsyphon-3.9.6 rsyphon-3.9.6-vanilla
+       diff -urN rsyphon-3.9.6-vanilla $MYSRC > /tmp/patch
+      </programlisting>
+      </para>
+      <para>
+      Make sure your patch does not include any extra files which do not belong
+      in a patch submission. Make sure to review your patch
+      <emphasis>after</emphasis> generated it with diff(1), to ensure accuracy.
+      </para>
+      <para>
+      The format of the patches made by SVN is compliant with these rules.
+      </para>
+      <para>
+      If your changes produce a lot of deltas, you may want to look into
+      splitting them into individual patches which modify things in logical
+      stages. This will facilitate easier reviewing by other Rsyphon
+      developers, very important if you want your patch accepted.
+      </para>
+    </section>
+    <section>
+      <title>E-mail size</title>
+      <para>
+      Large changes are not appropriate for mailing lists, and some
+      maintainers. If your patch, uncompressed, exceeds 40 kB in size, it is
+      preferred that you store your patch on an Internet-accessible server, and
+      provide instead a URL (link) pointing to your patch.      
+      </para>
+    </section>
+    <section>
+      <title> No MIME, no links, no compression, no attachments: just plain text</title>
+      <para>
+      It is important to be able to "quote" your changes, using standard e-mail
+      tools, so that they may comment on specific portions of your code. For
+      this reason, all patches should be submitting e-mail "inline".
+      </para>
+      <warning>
+        <para>
+        Be wary of your editor's word-wrap corrupting your patch, if you choose
+        to cut-n-paste your patch.
+        </para>
+      </warning>
+      <para>
+      Do not attach the patch as a MIME attachment, compressed or not. Many
+      popular e-mail applications will not always transmit a MIME attachment as
+      plain text, making it impossible to comment on your code. 
+      </para>
+    </section>
+  </section>
+      
+  <section>
+    <title>Tour of the Source Tree</title>
+    <section>
+      <title>Makefile Overview</title>
+      <para>
+	Currently, the make system is a single Makefile that
+	includes make snippets from other places in the tree.  This setup allows
+	you to easily depend on other make rules but also means all rules
+	must exist in a flat namespace.  Notice that the rules and
+	variables in each .rul file use a common prefix.  For example,
+	every rule in the parted.rul file begins with "parted_", and every
+	variable begins with "PARTED_".  Another thing to keep in mind when
+	working within this system is that all paths are relevant to the
+	toplevel.  We may change to a recursive make style build system at 
+	some point.
+      </para>
+    </section>
+    <section>
+      <title>Third Party Software</title>
+      <para>
+	The Rsyphon build system builds a mini Linux distribution called BOEL
+	that runs on clients during an autoinstall  (See "Additional Installation
+	Information" in Chapter 3 for more information on BOEL). The <filename>initrd.img</filename> 
+	file contains a subset of BOEL that is small enough to allow a fast startup of the clients
+	After the client has booted and
+	brought up networking, it receives the 
+	<filename>boel_binaries.tar.gz</filename> file and extracts it over
+	the root of the filesystem,  providing an additional set of
+	commands, libraries, and kernel modules that may be needed during the
+	installation.
+      </para>
+    </section>
+  </section>
+</chapter>
+  
+<!-- Keep this comment at the end of the file
+Local variables:
+mode: sgml
+sgml-omittag:t
+sgml-shorttag:t
+sgml-namecase-general:t
+sgml-general-insert-case:lower
+sgml-minimize-attributes:nil
+sgml-always-quote-attributes:t
+sgml-indent-step:2
+sgml-indent-data:t
+sgml-parent-document:nil
+sgml-exposed-tags:nil
+sgml-local-catalogs:nil
+sgml-local-ecat-files:nil
+End:
+-->

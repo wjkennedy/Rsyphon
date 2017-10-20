@@ -1,0 +1,236 @@
+#!/usr/bin/perl -w
+
+#
+#   "Rsyphon" 
+#
+#   Copyright (C) 1999-2011 Brian Elliott Finley
+#   
+#   $Id$
+#
+#
+#   2004.09.27  Brian Elliott Finley
+#   - allow -v as unique option for --verbose
+#   - tweak --help formatting
+#
+#   2011.07.18  Brian Elliott Finley
+#   - patch provided by Thomas Zeiser:
+#
+#       rsrmimage currently does not remove the UYOK boot files from
+#       (usually) /usr/share/rsyphon/boot/ARCH/IMAGE. The patch
+#       will try to remove them, too. Path and architecutre are
+#       determined as in other rsyphon tools/libs.
+#
+
+# set some variables
+$version_number="SYSTEMIMAGER_VERSION_STRING";
+$program_name="rsrmimage";
+$get_help = "         Try \"$program_name -help\" for more options.";
+
+# declare modules
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use File::Copy;
+use File::Path;
+use Getopt::Long;
+use Rsyphon::Server;
+use Rsyphon::Common;
+use Rsyphon::Config;
+
+### BEGIN parse the config file ###
+my $autoinstall_script_dir = $config->autoinstall_script_dir();
+unless ($autoinstall_script_dir) {
+    die "FATAL: parameter AUTOINSTALL_SCRIPT_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $autoinstall_boot_dir = $config->autoinstall_boot_dir();
+unless ($autoinstall_boot_dir) {
+    die "FATAL: parameter AUTOINSTALL_BOOT_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $rsyncd_conf = $config->rsyncd_conf();
+unless ($rsyncd_conf) {
+    die "FATAL: parameter RSYNCD_CONF is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $rsync_stub_dir = $config->rsync_stub_dir();
+unless ($rsync_stub_dir) {
+    die "FATAL: parameter RSYNC_STUB_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $default_override_dir = $config->default_override_dir();
+unless ($default_override_dir) {
+    die "FATAL: parameter DEFAULT_OVERRIDE_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+### END parse the config file ###
+
+### BEGIN functions ###
+sub trim {
+  my @out = @_;
+  for (@out) {
+    s/^\s+//;
+    s/\s+$//;
+  }
+  return wantarray ? @out : $out[0];
+}
+sub check_if_root{
+    unless($< == 0) { die "$program_name: Must be run as root!\n"; }
+}
+### END functions ###
+
+# set version information
+$version_info = <<"EOF";
+$program_name (part of Rsyphon) version $version_number
+
+Copyright (C) 1999-2001 Brian Elliott Finley <brian.finley\@baldguysoftware.com>
+Copyright (C) 2002 Bald Guy Software <brian.finley\@baldguysoftware.com>
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOF
+
+# set help information
+$help_info = $version_info . <<"EOF";
+
+Usage: $program_name [OPTION]... IMAGE
+
+Options: (options can be presented in any order)
+
+ --help
+    Display this output.
+
+ --version
+    Display version and copyright information.
+
+ --verbose, -v
+    Explain what is being done.
+
+ --force
+    Continue on error (default is to exit on error).
+
+Tip: Use \"rslsimage\" to get a list of available images.
+
+Download, report bugs, and make suggestions at:
+http://rsyphon.org/
+EOF
+
+# interpret command line options
+GetOptions( 
+
+  "help"        => \$help,
+  "version"     => \$version,
+  "force"       => \$force,
+  "verbose|v"   => \$verbose
+
+) or die qq($help_info);
+
+# if requested, print help information
+if($help) {
+  print qq($help_info);
+  exit 0;
+}
+
+# if requested, print version and copyright information
+if($version) {
+  print qq($version_info);
+  exit 0;
+}
+
+# Take the arguments left after Getopt::Long parses it's stuff out 
+# as the source and destination image names.
+$image=$ARGV[0];
+
+unless($image) { die "\n$program_name: Must specify IMAGE.\n$get_help\n\n"; }
+
+# be sure program is run by root
+check_if_root();
+
+$imagedir = Rsyphon::Server->get_image_path($rsync_stub_dir, $image);
+
+unless(($imagedir) or ($force)) { 
+  print "FATAL: Can't get path to image $image from image's stub file!\n";
+  print "       Nothing has been done.\n";
+  exit 1;
+}
+
+# get architecture of the image (for removing UYOK boot files later on)
+my $arch;
+$file=$imagedir . "/etc/rsyphon/boot/ARCH";
+if( -e $file ) {
+    open(FILE,"<$file") or die("Couldn't open $file for reading $!");
+      $arch = (<FILE>)[0];
+    close(FILE);
+    chomp $arch;
+}
+
+# remove image
+if($verbose) {print "  Removing image $image.\n";}
+$file=$imagedir;
+if($force) {
+  if($file) { rmtree($file, 0, 0); }
+} else {
+  rmtree($file, 0, 0) or die "FATAL: Can't remove $file!\n";
+}
+
+# remove override
+if($verbose) {print "  Removing override $image.\n";}
+$file="$default_override_dir/$image";
+if($force) {
+  if($file) { rmtree($file, 0, 0); }
+} else {
+  rmtree($file, 0, 0) or die "FATAL: Can't remove $file!\n";
+}
+
+# remove BitTorrent files
+if($verbose) {print "  Removing BitTorrent files for $image.\n";}
+$file = $config->autoinstall_tarball_dir() . "/image-" . $image . ".tar.gz";
+unlink($file) if (-f $file);
+$file = $config->autoinstall_tarball_dir() . "/image-" . $image . ".tar";
+unlink($file) if (-f $file);
+$file = $config->autoinstall_torrent_dir() . "/image-" . $image . ".tar.gz.torrent";
+unlink($file) if (-f $file);
+$file = $config->autoinstall_torrent_dir() . "/image-" . $image . ".tar.torrent";
+unlink($file) if (-f $file);
+
+# remove master autoinstall script
+if($verbose) {print "  Removing master autoinstall script $image.master.\n";}
+$file="$autoinstall_script_dir/$image.master";
+if($force) {
+  if($file) { unlink($file); }
+} else {
+  unlink($file) or die "FATAL: Can't remove $file!\n";
+}
+
+# remove soft links
+if($verbose) {print "  Removing softlinks that point to $image.master.\n";}
+$cmd="cd $autoinstall_script_dir; find . -lname $image.master -exec rm -f \\{\\} \\;";
+system($cmd);
+if($? != 0) { die "FATAL: couldn't remove softlinks that point to $image.master!"; }
+
+### BEGIN Remove entries in $rsyncd_conf ###
+
+Rsyphon::Server->remove_image_stub($rsync_stub_dir, $image);
+Rsyphon::Server->gen_rsyncd_conf($rsync_stub_dir, $rsyncd_conf);
+
+### END Remove entries in $rsyncd_conf ###
+
+# remove image from flamethrower.conf file
+my $entry_name = $image;
+my $flamethrower_conf = "/etc/rsyphon/flamethrower.conf";
+if(-e $flamethrower_conf) {
+    Rsyphon::Common->add_or_delete_conf_file_entry($flamethrower_conf, $entry_name) or
+        die "$program_name: Cannot remove entry from $flamethrower_conf";
+
+    # remove override entry from flamethrower.conf file
+    $entry_name = "override_" . $image;
+    Rsyphon::Common->add_or_delete_conf_file_entry($flamethrower_conf, $entry_name) or
+        die "$program_name: Cannot remove entry from $flamethrower_conf";
+}
+
+# remove UYOK boot files
+if(defined $arch) {
+    if($verbose) {print "  Removing UYOK files associated with $image.\n";}
+    $file="$autoinstall_boot_dir/$arch/$image";
+    if($force) {
+      if($file) { rmtree($file, 0, 0); }
+    } else {
+      rmtree($file, 0, 0) or print "WARNING: failed to remove UYOK boot files in $file\n   (ignore this warning if you are not using UYOK).\n";
+    }
+} else {
+    if($verbose) {print "  Architecture not defined, so NOT removing UYOK files associated with $image.\n";}
+}
+
+exit 0;

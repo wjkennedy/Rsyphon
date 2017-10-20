@@ -1,0 +1,1032 @@
+<!-- 
+  $Id$
+-->
+
+<chapter>
+ <title>FAQ (Frequently Asked Questions)</title>
+
+ <qandaset defaultlabel='qanda'>
+
+  <qandaentry>
+   <question><para>Where are the images stored?</para></question>
+   <answer>
+    <para>
+     The images are stored in <filename>/var/lib/rsyphon/images</filename>.
+    </para>
+    <note>
+     <para>
+      NOTE: If you are short on disk space in this location, move the
+      directory to another location:
+     </para>
+    </note>
+    <para>
+     <command>
+      mv /var/lib/rsyphon/images /home/rsyphon_images
+     </command>
+    </para>
+    <para>
+     Then create a soft link to the new directory.
+    </para>
+    <para>
+     <command>
+      ln -s /home/rsyphon_images /var/lib/rsyphon/images
+     </command>
+    </para>
+   </answer>
+  </qandaentry>
+ 
+  <qandaentry>
+   <question><para>How do I make an autoinstall CD?</para></question>
+   <answer>
+    <para>
+     Run the <command>rsmkautoinstallcd</command> command on the image server.
+    </para>
+   </answer>
+  </qandaentry>
+ 
+  <qandaentry>
+   <question>
+    <para>How do I make an autoinstall USB disk?</para>
+   </question>
+   <answer>
+    <para>
+     Run the <command>rsmkautoinstalldisk</command> command on the
+     image server.
+    </para>
+   </answer>
+  </qandaentry>
+
+  <qandaentry>
+   <question>
+    <para>
+     When I pass options from dhcp (option-100, etc), the client appears
+     to get and try to use a hexadecimal number instead.  How do I make it
+     pass a dotted-quad IP address instead?
+    </para>
+   </question>
+   <answer>
+    <para>
+     The hexadecimal address is actually the hexadecimal representation of
+     your IP address (you can verify this with the gethostip command).
+     This is normally a quoting issue.  Add quotes around the IP address
+     in the configuration file.
+    </para>
+   </answer>
+  </qandaentry>
+  <qandaentry>
+   <question>
+    <para>
+     I've got rsnetbootmond running, but it isn't working.  Why?
+    </para>
+   </question>
+   <answer>
+    <para>
+     In order for rsnetbootmond to do it's thang, you must have the rsync
+     daemon running: "/etc/init.d/rsyphon-server-rsyncd start".
+    </para>
+   </answer>
+  </qandaentry>
+     
+  <qandaentry>
+   <question>
+    <para>
+     How do I configure my server to net boot ia64 clients?
+    </para>
+   </question>
+   <answer>
+    <orderedlist>
+     <listitem>
+      <para>Install tftp (tftp-hpa >= 0.28 is recommended) on your boot server.
+      </para>
+     </listitem>
+     <listitem>
+      <para>
+        Configure inetd or xinetd to enable tftp.
+      </para>
+       <itemizedlist>
+        <listitem>
+         <para>
+          To configure inetd, find the tftp entry in 
+          <filename>/etc/inetd.conf</filename> and change it to: 
+         </para>
+         <para>
+tftp            dgram   udp     wait    root    /usr/sbin/in.tftpd -v -v -v -s /var/lib/tftpboot
+         </para>
+         <para>
+          Change "/usr/sbin/in.tftpd" to be the full path to your tftp server,
+          if you installed it in a different directory.
+         </para>
+         <para>
+          The -v's aren't strictly required but make the tftp server
+          more verbose, which makes it easier to diagnose problems.
+         </para>
+         <para>
+          Finally, send a HUP signal to inetd (this causes it to reload its
+          configuration file).  # killall -HUP inetd
+         </para>
+        </listitem>
+        <listitem>
+         <para>
+          To configure xinetd, change:
+         </para>
+         <programlisting>
+   service tftp
+{
+        socket_type             = dgram
+        protocol                = udp
+        wait                    = yes
+        user                    = root
+        server                  = /usr/sbin/in.tftpd
+        server_args             = -s /home/tftp
+        disable                 = no
+}
+         </programlisting>
+         <para>to:</para>
+         <programlisting>
+service tftp
+{
+        socket_type             = dgram
+        protocol                = udp
+        wait                    = yes
+        user                    = root
+        server                  = /usr/sbin/in.tftpd
+        server_args             = -s /var/lib/tftpboot -r blksize
+        disable                 = no
+}
+         </programlisting>
+         <para>
+          Finally, send a USR2 signal to xinetd (this causes it to reload its
+          configuration file).
+         </para>
+        </listitem>
+       </itemizedlist>
+      </listitem>
+      <listitem>
+       <para>
+        Configure your DHCP server so that it provides boot 
+        information to the client. Be careful when setting up your DHCP 
+        server - if it is set to hand out dynamic addresses and is located on 
+        a public subnet, it may give bogus information to other machines on the
+        network, possibly destroying data on those machines. It is recommended 
+        that you use a private subnet for doing network installs. If possible, you should 
+	  also configure your DHCP server to only answer requests
+        from known hosts based on the MAC address.
+       </para>
+       <para>
+        Add an entry for the boot client in /etc/dhcpd.conf
+       </para>
+       <programlisting>
+host mcmuffin {
+        hardware ethernet 00:30:6e:1e:0e:83;
+        fixed-address 10.0.0.21;
+        filename "elilo.efi";
+}
+       </programlisting>
+      </listitem>
+      <listitem>
+       <para>
+        Copy elilo.efi from an IA-64 machine to your tftpboot directory and make them
+        world readable.  This file is usually found in a subdirectory under /boot/efi or
+        in /usr/lib/elilo.  It can also be found in the elilo package in IA64
+        distributions.
+       </para>
+       <para>
+        You also must create an elilo.conf file in your tftpboot directory.
+        A sample one is provided in /usr/share/doc/rsyphon-doc/examples, or you
+        can type in the one below.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Edit /var/lib/tftpboot/elilo.conf:
+       </para> 
+       <programlisting>
+#
+# Sample elilo.conf for netbooting ia64 rsyphon clients
+#
+# Inside your tftp directory you may also want to do this:
+#
+#   mkdir -p ia64/standard
+#   cp /usr/share/rsyphon/boot/ia64/standard/* ia64/standard/
+#
+default=rsyphon
+ 
+image=ia64/standard/kernel
+    label=rsyphon
+    initrd=ia64/standard/initrd.img
+    root=/dev/ram
+    append="vga=extended ramdisk_blocksize=4096 console=tty0"
+    #
+    # Uncomment APPEND line below, and comment out APPEND line above, to use
+    # both monitor (tty0) and first serial port (ttyS0) as console at the
+    # same time.
+    #
+    # NOTE: Be sure your serial port speed is appropriate (57600, 9600, etc.)
+    #
+    #append="vga=extended ramdisk_blocksize=4096 console=tty0 console=ttyS0,9600n8"
+    read-only
+       </programlisting>
+       <para>
+        If ABCDEFGH is the client's IP address in hex, elilo.efi will use the 
+        first one of the following files that it finds as its configuration
+        file:
+       </para>
+       <itemizedlist>
+        <listitem><para>ABCDEFGH.conf</para></listitem>
+        <listitem><para>ABCDEFG.conf</para></listitem>
+        <listitem><para>ABCDEF.conf</para></listitem>
+        <listitem><para>...</para></listitem>
+        <listitem><para>A.conf</para></listitem>
+        <listitem><para>elilo.conf</para></listitem>
+       </itemizedlist>
+       <para>
+        You can use the ipcalc utility, which is available in the syslinux
+        package, to calculate the hex representation of an IP address in
+        dotted quad form.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Configure the client to support TFTP booting.
+       </para>
+       <orderedlist>
+        <listitem><para>Boot to EFI</para></listitem>
+        <listitem>
+         <para>Enter the Boot option maintenance menu</para>
+        </listitem>
+        <listitem><para>Add a boot option</para></listitem>
+        <listitem>
+         <para>
+          Press return on the line saying "Load file [Acpi/.../Mac()]"
+         </para>
+        </listitem>
+        <listitem>
+         <para>
+          Call the entry Netboot or something similar
+         </para>
+        </listitem>
+        <listitem> 
+         <para>
+          Save and exit, Netboot is now available in the boot menu.
+         </para>
+        </listitem>
+       </orderedlist>
+      </listitem>
+     </orderedlist>
+    </answer>
+  </qandaentry>
+
+  <qandaentry>
+   <question>
+    <para>
+     How do I set up my autoinstall clients so that the console is
+     available via the serial port?
+    </para>
+   </question>
+   <answer>
+    <para>
+    	<command>rsmkautoinstallcd</command> and <command>rsmkautoinstalldisk</command>
+    	support an -append option, allowing you to specify additional options for the autoinstall kernel,
+    	including serial console options.  For example:  
+    	<command>rsmkautoinstallcd -out-file autoinstall.iso -append "console=ttyS0"</command>
+    </para>
+   </answer>
+  </qandaentry>
+      
+  <qandaentry>
+    <question>
+      <para>Does the DHCP server have to be on the image server?</para>
+    </question>
+    <answer>
+      <para>
+        No.  If you are using DHCP, you can use "option-140" and set its
+        value to the IP address of the image server.  If you use
+        <command>rsmkdhcpstatic</command> to configure your
+        <filename>dhcpd.conf</filename>
+        file, it will ask you for the IP address of your image server and
+        add the appropriate entry for you.
+      </para>
+      <para>
+        Because this is not the official use for option-140, work is being
+        done to either get an official number assigned or use a number from
+        the private number range.
+      </para>
+    </answer>
+  </qandaentry>
+ 
+  <qandaentry>
+   <question><para>With which distributions does Rsyphon work?</para></question>
+   <answer>
+    <para>
+     Rsyphon is designed to work with _any_ distribution.  Post imaging
+     configuration is handled by System Configurator, which uses a "footprinting" 
+     technique to identify the style of system configuration files used, and to
+     configure networking, boot, and similar information accordingly.  If you find
+     a distribution that Rsyphon does not work with, please file a bug report.
+    </para>
+   </answer>
+  </qandaentry>
+ 
+    <qandaentry>
+      <question>
+	<para>
+	  How do I add a driver for a special card to the autoinstall kernel?
+	</para>
+      </question>
+      <answer>
+	<para>
+	  If you have hardware that requires a driver that was not included
+	  in the standard flavor boot package, you can build a custom boot
+	  package with UYOK feature. See
+          <ulink url="http://wiki.rsyphon.org/index.php/UYOK">
+          http://wiki.rsyphon.org/index.php/UYOK
+          </ulink>).
+	</para>
+      </answer>
+    </qandaentry>
+    	
+  <qandaentry>
+    <question>
+      <para>
+        Do I have to do anything to prepare a client from which I will get 
+        an image?
+      </para>
+    </question>
+    <answer>
+      <para>
+        Yes, you should install the rsyphon-client package.  If this
+        package is already installed, simply run the
+        <command>rsprepareclient</command> command prior to running
+        <command>rsgetimage</command> from the image server.
+      </para>
+      <para>
+        You should also add any software, configure any files, and do
+        any tweaking to customize the system to your specifications.
+      </para>
+    </answer>
+  </qandaentry>
+  <qandaentry>
+    <question>
+      <para>
+        Can I use the autoinstalldisk or autoinstallcd on more than one
+        machine?
+      </para>
+    </question>
+    <answer>
+      <para>
+        Yes.  The autoinstall media is generic and can be on any machine
+        you want to autoinstall.
+      </para>
+    </answer>
+  </qandaentry>
+
+  <qandaentry>
+    <question><para>How do I push an image to a client?</para></question>
+    <answer>
+      <para>
+        Starting with version 3.8.0, you can use the
+        <command>rspushinstall</command> command, which opens an SSH tunnel
+        from the image server to the clients. Then each client downloads the
+        image using the SSH tunnel opened by the image server. This is the most
+        secure approach to install clients over insecure networks.
+      </para>
+    </answer>
+  </qandaentry>
+
+  <qandaentry>
+    <question>
+    <para>How do I pull an image to a client?</para>
+    </question>
+    <answer>
+      <para>
+        If you ran <command>rsmkdhcpserver</command> to configure your dhcp 
+        information, and if you answered all the questions you were asked
+        when you did ran <command>rsgetimage</command>, including the
+        hostnames and IP addresses, then all you have to do is boot your
+        client with any one of the following three forms of autoinstall
+        media:  
+      </para>
+      <orderedlist>
+        <listitem>
+          <para>
+    	<emphasis>autoinstallcd</emphasis> - it takes slightly little time
+    	to boot and is more durable, but you have to have a CD burner
+    	and clients that can read CD-R's)
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+    	<emphasis>autoinstalldisk</emphasis> - it takes slightly little time
+    	to boot, but requires that the BIOS of your clients support boot over
+        USB devices.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+    	<emphasis>network boot</emphasis> - boot time is dramatically,
+    	 but this method requires PXE capable network cards in the
+             clients and additional server-side configuration.
+          </para>
+        </listitem>
+      </orderedlist>
+      <para>
+        See the entries for <command>rsmkautoinstallcd</command> and 
+        <command>rsmkautoinstalldisk</command> in the command
+	  reference chapter in this manual for more information.
+      </para>
+    </answer>
+  </qandaentry>
+
+  <qandaentry>
+    <question>
+      <para>
+        How does an autoinstall client know which image to install?
+      </para>
+    </question>
+    <answer>
+      <para>
+        In order to better understand the answer, begin by reading
+        the steps the autoinstall client goes through:
+      </para>
+      <orderedlist>
+        <listitem>
+          <para>
+    	Boots off the autoinstallmedia
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+    	Gets an IP address from DHCP
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+    	Determines the IP address of the image server via DHCP
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+    	Requests a hosts file from the image server
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+    	Finds its hostname in the hosts file based on its IP address
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+    	Requests a script from the image server based on its hostname
+    	(for example: <filename>www237.sh</filename>)
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+    	Executes this script.
+          </para>
+        </listitem>
+      </orderedlist>
+      <para>
+        The script in question is typically a soft link pointing at the 
+        <filename>$image.master</filename> script that was dynamically
+        created when you ran <command>rsgetimage</command>.  This script
+        explicitly states which image to pull from the image server.  Open
+        it and take a look.
+      </para>
+      <para>
+        These scripts and the <filename>$image.master</filename> script can
+        be found in <filename>/var/lib/rsyphon/scripts</filename>.
+      </para>
+    </answer>
+  </qandaentry>
+
+  <qandaentry>
+    <question>
+      <para>What if I want to assign static IPs to my clients?</para>
+    </question>
+    <answer>
+      <para>
+        You can. <command>rsgetimage</command> will ask you if you want to
+        assign static IPs.
+      </para>
+    </answer>
+  </qandaentry>
+
+  <qandaentry>
+    <question>
+      <para>
+        I want to use DHCP to assign static IPs to my clients, but I don't 
+        want to have to enter my 1000 mac addresses manually.  What can I
+        do?
+      </para>
+    </question>
+    <answer>
+      <para>
+        Rsyphon comes with the <command>rsmkdhcpstatic</command>
+        utility.  As you boot your client systems, the DHCP server will
+        assign addresses sequentially.  By initially booting your systems
+        in the order you want them to receive their IP addresses, you can
+        ensure that they get the IP address you want them to have.  
+      </para>
+      <para>
+        After booting your systems, run <command>rsmkdhcpstatic</command>.
+        It will re-write your <filename>/etc/dhcpd.conf</filename> file,
+        associating each client's MAC address with its host name.  You
+        should then restart your dhcpd daemon.  Subsequently, each time
+        your clients request an IP address via DHCP, they will always be
+        assigned their appropriate static IP address.
+      </para>
+      <para>
+        Note:  The client's hostname is used, instead of an explicit IP
+        address, so that you simply have to change the
+        <filename>hosts</filename> file on the DHCP server (or DNS, NIS,
+        etc.) to change the IP address that that client recieves.
+      </para>
+      <para>
+        Note:  Assigning static IP addresses by DHCP is the author's
+        preferred method for administering IP on a large number of systems.
+      </para>
+    </answer>
+  </qandaentry>
+
+  <qandaentry>
+    <question>
+      <para>What kind of performance can I expect?</para>
+    </question>
+    <answer>
+      <para>
+       Ole Holm Nielsen, Department of Physics, Technical University of Denmark reports:
+      </para>
+
+      <para>
+       In our Rsyphon installation, we can install 18 clients 
+       simultaneously with 1.8 GB images in 6 minutes.  Please see 
+       <ulink url="http://www.fysik.dtu.dk/CAMP/Niflheim/rsyphon.html">The NIFLHEIM Rsyphon Page</ulink>.
+       Our server has Gigabit network, 2 GB of RAM, dual Intel Xeon 2.4 GHz,
+       whereas the clients have Intel P4 and 100 Mbit Ethernet.
+      </para>
+      <para>
+       James Braid reports:
+      </para>
+      <para>
+       From a Celeron 700/512Mb server over 100Mbit ethernet, we manage to do a ~1Gb
+       image in about 7 - 10 min.  The disks are 5x 120Gb Seagate Barracuda V in one 
+       LVM set (non striped), with a ReiserFS filesystem.
+      </para>
+    </answer>
+  </qandaentry>
+
+  <qandaentry>
+    <question>
+      <para>How do I update an image on the image server?</para>
+    </question>
+    <answer>
+      <para>
+        There are two ways to update an image on the image server:
+      </para>
+      <orderedlist>
+        <listitem>
+          <para>
+    	Make the changes to one of your clients and run the 
+    	<command>rsgetimage</command> again.  
+          </para>
+          <para>
+    	- You can specify the same image name, in which case the
+    	current image will be updated (only changes are pulled across).
+          </para>
+          <para>
+    	- Or you can specify a new image name and have a form of
+    	revision control.  (This method is highly recommended)
+          </para>
+          <para>
+    	Note:  Every time <command>rsgetimage</command> is run, it 
+    	recreates the <filename>$image.master</filename> script.  If
+            you
+    	have customized your <filename>$image.master</filename> script,
+    	be sure to save it before running <command>rsgetimage</command>
+    	again.
+          </para>
+        </listitem>
+ 
+        <listitem>
+          <para>
+    	Modify the files directly.  You can simply cd into the
+    	appropriate image directory and edit the files there, or
+    	(recommended) you can <command>cd </command>into the image
+    	directory and run <command>'chroot . sh'</command>.  This will
+    	change your working root directory to the root of the image you
+    	want to manipulate.  You can then run <command>rpm</command>
+    	and other commands on the image and not have to worry
+    	about getting confused and damaging the image server.  When you
+    	are done, simply type <command>exit</command> and you will be
+    	returned to your normal shell.
+          </para>
+        </listitem>
+      </orderedlist>
+    </answer>
+  </qandaentry>
+
+  <qandaentry>
+    <question>
+      <para>How do I update a client to match an image?</para>
+    </question>
+    <answer>
+      <para>
+        Once you have updated an image on the image server, you can then
+        update your clients to reflect it.  (You do not need
+        to do a complete re-autoinstall.)  You will find the
+        command, <command>rsupdateclient</command>, on your clients, which
+        takes as its parameters the name of the image server and
+        the name of the image you want to update the client to.  Run
+        <command>rsupdateclient -help</command> to get more information about
+        this command.
+      </para>
+      <para>
+        Use the revision control method recommended in the "How do I
+        update an image on the image server?" FAQ to
+        bring your production environment back to a known state after
+        doing an <command>rsupdateclient</command> to a test image (i.e. do
+        an <command>rsupdateclient</command> to the last working image).
+      </para>
+      <para>
+        The file
+        <filename>/etc/rsyphon/updateclient.local.exclude</filename>
+        on your clients is used to exclude files and directories from
+        being updated by the <command>rsupdateclient</command> command.
+        You can modify it to suit your own environment.
+      </para>
+    </answer>
+  </qandaentry>
+
+  <qandaentry>
+    <question>
+      <para>
+        What is the <filename>updateclient.local.exclude</filename> file
+        used for?
+      </para>
+    </question>
+    <answer>
+      <para>
+        It is used by the <command>rsupdateclient</command> command.  See the
+        "How do I update a client to match an image?," FAQ for more 
+        information.
+      </para>
+    </answer>
+  </qandaentry>
+
+  <qandaentry>
+     <question>
+       <para>
+         How can I use Rsyphon to update a small set of files? For 
+         instance, I apply a security patch and I want all boxes to reflect 
+         that change.
+       </para>
+     </question>
+     <answer>
+       <para>
+         Use the <command>rsupdateclient</command>
+         command on the client.
+       </para>
+       <para>
+         <orderedlist>
+           <listitem>
+     	<para>
+     	  Choose one of the following methods to update the image on
+     	  the server:
+     	  <orderedlist>
+     	    <listitem>
+     	      <para>
+     		apply the patch to the image directly
+     	      </para>
+     	    </listitem>
+     	    <listitem>
+     	      <para>
+     		apply the patch to a client and then do another
+     		<command>rsgetimage</command> specifying the same imagename (won't take long
+     		and will update the image)
+     	      </para>
+     	    </listitem>
+     	    <listitem>
+     	      <para>
+     		apply the patch to a client and then do another
+     		<command>rsgetimage</command> specifying a different imagename.  This is
+     		preferred as it allows for revision control.
+     	      </para>
+     	    </listitem>
+     	  </orderedlist>
+     	</para>
+           </listitem>
+           
+           <listitem>
+     	<para>
+     	  Run <command>rsupdateclient</command> on the clients that you
+     	  want to update.  Execute
+     	  <command>rsupdateclient -help</command> to get the syntax.
+     	</para>
+           </listitem>
+         </orderedlist>
+       </para>
+     </answer>
+  </qandaentry>
+ 
+  <qandaentry>
+     <question>
+       <para>
+         Is there a log file where autoinstall client status is kept?
+       </para>
+     </question>
+     <answer>
+       <para>
+         Yes.  Rsyphon logs can be found on the image server in the
+         directory <filename>/var/log/rsyphon</filename>
+       </para>
+     </answer>
+  </qandaentry>
+ 
+  <qandaentry>
+   <question><para>What other software is Rsyphon based on?</para></question>
+   <answer>
+    <para>
+     Rsyphon is mostly written in Perl, and makes use of the following software:
+     <ItemizedList>
+      <ListItem> <para><command>busybox</command></para> </ListItem>
+      <ListItem> <para><command>bc</command></para> </ListItem>
+      <ListItem> <para><command>devfsd</command></para> </ListItem>
+      <ListItem> <para><command>ISC dhcp</command></para> </ListItem>
+      <ListItem> <para><command>dosfstools</command></para> </ListItem>
+      <ListItem> <para><command>e2fsprogs</command></para> </ListItem>
+      <ListItem> <para><command>jfsutils</command></para> </ListItem>
+      <ListItem> <para><command>xfsprogs</command></para> </ListItem>
+      <ListItem> <para><command>Linux kernel</command></para> </ListItem>
+      <ListItem> <para><command>parted</command></para> </ListItem>
+      <ListItem> <para><command>pxelinux</command></para> </ListItem>
+      <ListItem> <para><command>rsync</command></para> </ListItem>
+      <ListItem> <para><command>syslinux</command></para> </ListItem>
+      <ListItem> <para><command>raidtools</command></para> </ListItem>
+      <ListItem> <para><command>reiserfsprogs</command></para> </ListItem>
+      <ListItem> <para><command>systemconfigurator</command></para> </ListItem>
+      <ListItem> <para><command>uClibc</command></para> </ListItem>
+     </ItemizedList>
+    </para>
+    <para>
+     Also be sure to take a look at System Installation Suite (SIS), which includes
+     SystemInstaller, Rsyphon, and System Configurator.  SystemInstaller is a 
+     tool that allows you to install images directly to a Rsyphon 
+     image server.  System Configurator, which is also used by the standard Rsyphon 
+     release, performs configuration of target machine uniquenesses such as IP addresses, 
+     network cards, and initial RAM disks needed to boot clients after installation.
+    </para>
+   </answer>
+  </qandaentry>
+
+  <qandaentry>
+   <question>
+    <para>
+     What's an override directory?
+    </para>
+   </question>
+   <answer>
+    <para>
+     An override directory is a directory that gets copied over to your target
+     machines after the main image is transferred.  All contents in the override
+     directory are copied over to the root of the target machine's new
+     filesystem.  All file attributes are replicated, including directories,
+     permissions, and ownership.  This allows you to "over-ride" files in the
+     image.  Override directories live in
+     <command>/var/lib/rsyphon/overrides/</command>.
+    </para>
+    <para>
+     Simply edit the master autoinstall script and change the overrides
+     variable to include the appropriate override directory.  For example, you
+     could change <command>OVERRIDES="my_image"</command> to 
+     <command>OVERRIDES="my_image-ide"</command>.
+    </para>
+    <para>
+     If using the same overrides on all of your machines, you don't
+     have to change the autoinstall script.  Simply put the files that
+     you want to override in the overrides directory that has the same name as
+     your image, and proceed.
+    </para>
+    <para>
+     You can also use multiple override directories, which are used in the order 
+     that you specify them -- each directory 
+     overriding the previous directories.  You can use this methodology in a
+     highly complex environment where  slight variations exist between
+     several classes of machines but where they all start with the same base
+     image.  For example, <command>OVERRIDES="my_image-ide web_app"</command>.  
+    </para>
+   </answer>
+  </qandaentry>
+
+  <qandaentry>
+   <question>
+    <para>
+     How do I expand a filesystem?
+    </para>
+   </question>
+   <answer>
+    <para>
+     See "How do I change the size of a partition?"
+    </para>
+   </answer>
+  </qandaentry>
+ 
+  <qandaentry>
+   <question>
+    <para>
+     How do I change the size of a partition?
+    </para>
+   </question>
+   <answer>
+    <para>
+     <orderedlist>
+      <listitem>
+       <para>
+        Open your autoinstallscript.conf file in your favourite text editor.
+       </para>
+	      <note>
+		<para>
+		  The default autoinstallscript.conf file created by
+		  <command>rsprepareclient</command> lives in the 
+		  <filename>/etc/rsyphon</filename> directory in your 
+		  image.
+		</para>
+	      </note>
+      </listitem>
+      <listitem>
+       <para>
+        Find the <command>&lt;disk&gt;</command> section where
+        <command>dev</command> is set to the disk that holds the partition 
+        you want to change.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Find the <command>&lt;part&gt;</command> entry where 
+        <command>num</command> is the number of the partition in question.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Change <command>size</command> to the new partition size, keeping in mind that if the size
+        you specify is not sufficient to hold the files stored there,
+        the autoinstall will fail.
+       </para>
+       <para>
+        NOTE: Each <command>&lt;disk&gt;</command> section can use either MB
+        (megabytes) or % (percentages) to specify partition sizes.  See  
+        <command>man autoinstallscript.conf</command> for more information.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Run <command>rsmkautoinstallscript</command> to create a new 
+        autoinstall script using the new parameters.
+       </para>
+       <para>
+        NOTE: By default, <command>rsmkautoinstallscript</command> uses the
+        autoinstallscript.conf file located in your image's ./etc/rsyphon directory.  
+        See <command>man rsmkautoinstallscript</command> and 
+        <command>man autoinstallscript.conf</command> for more information.
+       </para>
+      </listitem>
+     </orderedlist>
+    </para>
+   </answer>
+  </qandaentry>
+
+  <qandaentry>
+   <question>
+    <para>
+     How do I change the filesystem(s) that my target machine(s) will use?
+    </para>
+   </question>
+   <answer>
+    <para>
+     <orderedlist>
+      <listitem>
+       <para>
+        Make sure that the kernel in your image supports the filesystem(s) 
+        you want to use.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Open your autoinstallscript.conf file in your favorite text editor.
+       </para>
+       <para>
+        NOTE: The default autoinstallscript.conf file created by
+        <command>rsprepareclient</command> lives in the ./etc/rsyphon
+        directory in your image.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Find the <command>&lt;fsinfo&gt;</command> entry where
+        <command>mp</command> (mount point) is set to the filesystem that you 
+        want to change.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Change <command>fs</command> to the filesystem you want to use.
+        See <command>man autoinstallscript.conf</command> for a list of
+        supported filesystems.
+       </para>
+       <para>
+        You must understand the capabilities of your chosen filesystem.  Depending on which
+	  one you use, you may also need to change the options used to mount the filesystem, which
+	  are set by the <command>options</command> entry.  If you choose unsupported
+        options, your autoinstall may fail.
+       </para>
+       <para>
+        In all known cases to date, it has not been necessary to change the <command>fs</command> 
+	  entries in the <command>&lt;disk&gt;</command> section when changing filesystem types.
+        The <command>fs</command> entries in the 
+        <command>&lt;disk&gt;</command> section don't actually determine the
+        filesystem that will be created on those partitions, but the 
+        <command>parted</command> tool that Rsyphon uses for creating disk
+        partitions requires that argument.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Run <command>rsmkautoinstallscript</command> to create a new 
+        autoinstall script using the new parameters. By default, 
+	  <command>rsmkautoinstallscript</command> uses the autoinstallscript.conf 
+	  file located in the ./etc/rsyphon directory in
+        your image.  See <command>man rsmkautoinstallscript</command> and 
+        <command>man autoinstallscript.conf</command> for more information.
+       </para>
+      </listitem>
+     </orderedlist>
+    </para>
+   </answer>
+  </qandaentry>
+ 
+  <qandaentry>
+   <question>
+    <para>
+     How do I change the disk type(s) that my target machine(s) will use?
+    </para>
+   </question>
+   <answer>
+    <para>
+     <orderedlist>
+      <listitem>
+       <para>
+        Make sure that the kernel in your image has drivers for the disk types
+        you want to use.  
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Run <command>rsmkautoinstallscript --autodetect-disks ...</command> to create a new 
+        autoinstall script that will be able to automatically detect disk types at
+        run-time during the imaging of your clients.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        An alternative method is to manually modify autoinstallscript.conf and
+        re-run <command>rsmkautoinstallscript</command>.
+       </para>
+      </listitem>
+     </orderedlist>
+    </para>
+   </answer>
+  </qandaentry>
+ 
+  <qandaentry>
+   <question>
+    <para>
+     Can I use a single image across machines with differing disk or
+     partition configurations?
+    </para>
+   </question>
+   <answer>
+    <para>
+     Yes. Be sure to use <command>--autodetect-disks</command> with
+     <command>rsgetimage</command> or <command>rsmkautoinstallscript</command>
+     if you have different disk types in your clients and create a different
+     <filename>autoinstallscript.conf</filename> and master script for each partitioning schema you
+     want to use.
+    </para>
+   </answer>
+  </qandaentry>
+ 
+ </qandaset>
+  <section>
+  <title>
+  See also
+  </title>
+  <para>
+  Consult the troubleshooting guide on the Rsyphon web site at
+  <ulink url="http://wiki.rsyphon.org/index.php/Troubleshooting">http://wiki.rsyphon.org/index.php/Troubleshooting</ulink>
+  and the online FAQ at
+  <ulink url="http://wiki.rsyphon.org/index.php/FAQ">http://wiki.rsyphon.org/index.php/FAQ</ulink>
+  for details.
+  </para>
+  </section>
+ 
+</chapter>

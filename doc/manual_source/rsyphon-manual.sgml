@@ -1,0 +1,140 @@
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V4.1//EN" [
+  <!ENTITY siaddclients              SYSTEM "../man/rsaddclients.content.sgml">
+  <!ENTITY autoinstallscript.conf  SYSTEM "../man/autoinstallscript.conf.content.sgml">
+  <!ENTITY sicpimage                 SYSTEM "../man/rscpimage.content.sgml">
+  <!ENTITY sigetimage                SYSTEM "../man/rsgetimage.content.sgml">
+  <!ENTITY silsimage                 SYSTEM "../man/rslsimage.content.sgml">
+  <!ENTITY simkautoinstallcd         SYSTEM "../man/rsmkautoinstallcd.content.sgml">
+  <!ENTITY simkautoinstallscript     SYSTEM "../man/rsmkautoinstallscript.content.sgml">
+  <!ENTITY simkbootserver            SYSTEM "../man/rsmkbootserver.content.sgml">
+  <!ENTITY simkdhcpserver            SYSTEM "../man/rsmkdhcpserver.content.sgml">
+  <!ENTITY simkdhcpstatic            SYSTEM "../man/rsmkdhcpstatic.content.sgml">
+  <!ENTITY simvimage                 SYSTEM "../man/rsmvimage.content.sgml">
+  <!ENTITY siprepareclient           SYSTEM "../man/rsprepareclient.content.sgml">
+  <!ENTITY sirmimage                 SYSTEM "../man/rsrmimage.content.sgml">
+  <!ENTITY simkrsyncdconf            SYSTEM "../man/rsmkrsyncd_conf.content.sgml">
+  <!ENTITY siupdateclient            SYSTEM "../man/rsupdateclient.content.sgml">
+
+  <!ENTITY chapter1                SYSTEM "intro.sgml">
+  <!ENTITY chapter2                SYSTEM "installation.sgml">
+  <!ENTITY chapter3                SYSTEM "usage.sgml">
+  <!ENTITY chapter4                SYSTEM "bittorrent-howto.sgml">
+  <!ENTITY chapter5                SYSTEM "flamethrower-howto.sgml">
+  <!ENTITY chapter6                SYSTEM "ssh-howto.sgml">
+  <!ENTITY chapter7                SYSTEM "monitoring.sgml">
+  <!ENTITY chapter8                SYSTEM "file-distribution-howto.sgml">
+  <!ENTITY chapter9                SYSTEM "faq.sgml">
+  <!ENTITY chapter10               SYSTEM "troubleshooting.sgml">
+  <!ENTITY chapter11               SYSTEM "develop.sgml">
+
+  <!ENTITY SIVERSION               SYSTEM "../../VERSION">
+
+  <!ENTITY dhfirstname             "<firstname>dann</firstname>">
+  <!ENTITY manfirstname            "<firstname>dann</firstname>">
+  <!ENTITY dhsurname               "<surname>frazier</surname>">
+  <!ENTITY mansurname              "<surname>frazier</surname>">
+  <!ENTITY dhdate                  "<date>November  10, 2002</date>">
+  <!ENTITY mandate                 "<date>November  10, 2002</date>">
+  <!ENTITY dhsection               "<manvolnum>8</manvolnum>">
+  <!ENTITY mansection              "<manvolnum>8</manvolnum>">
+  <!ENTITY dhemail                 "<email>dannf@dannf.org</email>">
+  <!ENTITY manemail                "<email>dannf@dannf.org</email>">
+  <!ENTITY dhusername              "dann">
+  <!ENTITY manusername             "dann">
+
+  <!ENTITY debian                  "<productname>Debian GNU/Linux</productname>">
+  <!ENTITY gnu                     "<acronym>GNU</acronym>">
+]>
+
+<book>
+ <bookinfo>
+  <title>Rsyphon<superscript>&#174;</superscript> v&SIVERSION; Manual</title>
+  <pubdate>$Date$</pubdate>
+  
+  <authorgroup>
+   <collab><collabname>Andrea Righi</collabname></collab>
+   <collab><collabname>Ari Jort</collabname></collab>
+   <collab><collabname>Austin Gonyou</collabname></collab>
+   <collab><collabname>Ben Spade</collabname></collab>
+   <collab><collabname>Brian Elliott Finley</collabname></collab>
+   <collab><collabname>Curtis Zinzilieta</collabname></collab>
+   <collab><collabname>Dann Frazier</collabname></collab>
+   <collab><collabname>Denise Walters</collabname></collab>
+   <collab><collabname>Greg Pratt</collabname></collab>
+   <collab><collabname>Jason R. Mastaler</collabname></collab>
+   <collab><collabname>Josh Aas</collabname></collab>
+  </authorgroup>
+  <abstract>
+   <para>
+    <application>Rsyphon</application> was created by Brian Elliott Finley.
+    The current maintainer and team lead of the project is Andrea Righi.
+   </para>
+
+   <para>
+    <application>Rsyphon</application> is software that automates Linux installs, software 
+    distribution, and production deployment.
+    <application>Rsyphon</application> makes it easy to do automated installs (clones), software 
+    distribution, content or data distribution, configuration changes, and 
+    operating system updates to your network of Linux machines. You can even 
+    update from one Linux release version to another.
+   </para>
+
+   <para>
+    It can also be used to ensure safe production deployments. By saving your
+    current production image before updating to your new production image, 
+    you have a highly reliable contingency mechanism. If the new production 
+    enviroment is found to be flawed, simply roll-back to the last production 
+    image with a simple update command.
+   </para>
+
+   <para>
+    Some typical environments include: high performance clusters, Internet 
+    server farms, database server farms, computer labs, and corporate desktop
+    environments. 
+   </para>
+
+   <para>
+    Be sure to view the CREDITS file for a listing of other people who have
+    contributed code or documentation that has been incorporated into
+    <application>Rsyphon</application>.  Many thanks go to these people,
+    as their relentless pursuit in the discovery bugs and the occasional code
+    contribution are invaluable.
+   </para>
+  </abstract>
+  <legalnotice>
+   <title>Trademark Notices</title>
+   <para>
+    Rsyphon<superscript>&#174;</superscript> is a registered trademark of
+    Brian Finley.
+   </para>
+   <para>
+    Linux<superscript>&#174;</superscript> is a registered trademark of Linus
+    Torvalds.
+   </para>
+   <para>
+    Debian<superscript>&#174;</superscript> is a registered trademark of Software
+    in the Public Interest, Inc.
+   </para>
+   <para>
+    Red Hat<superscript>&#174;</superscript> is a registered trademark of Red Hat,
+    Inc. in the United States and other countries.
+   </para>
+   <para>
+    Solaris<superscript>&#174;</superscript> is a registered trademark of Sun
+    Microsystems, Inc.
+   </para>
+  </legalnotice>
+ </bookinfo>
+
+ &chapter1;  
+ &chapter2;
+ &chapter3;
+ &chapter4;
+ &chapter5;
+ &chapter6;
+ &chapter7;
+ &chapter8;
+ &chapter9;
+ &chapter10;
+
+</book>

@@ -1,0 +1,37 @@
+#
+# "Rsyphon"
+#
+#  Copyright (C) 2002 Bald Guy Software 
+#                     Brian E. Finley <brian.finley@baldguysoftware.com>
+#
+#   $Id$
+#
+
+################################################################################
+#
+# Specifically configured for Rsyphon autoinstall clients.
+#
+Port 22
+Protocol 2
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_dsa_key
+KeyRegenerationInterval 3600
+ServerKeyBits 768
+SyslogFacility AUTH
+LogLevel INFO
+LoginGraceTime 600
+PermitRootLogin yes
+StrictModes yes
+RSAAuthentication yes
+PubkeyAuthentication yes
+AuthorizedKeysFile     .ssh/authorized_keys
+IgnoreRhosts yes
+RhostsRSAAuthentication no
+HostbasedAuthentication no
+PermitEmptyPasswords no
+PasswordAuthentication no
+X11Forwarding no
+X11DisplayOffset 10
+PrintMotd no
+KeepAlive yes
+Subsystem	sftp	/usr/lib/sftp-server

@@ -1,0 +1,96 @@
+#!/bin/sh
+#
+#   "Rsyphon"
+#
+#   Copyright (C) 2005 Andrea Righi
+#
+# Support for IRIX style chkconfig:
+# chkconfig:   35 20 20
+# description: The Rsyphon rsmonitor daemon.
+#
+#
+# Support for LSB compliant init system:
+### BEGIN INIT INFO
+# Provides: rsyphon-server-monitord
+# Required-Start: $network
+# Required-Stop:
+# Default-Start:  3 5
+# Default-Stop:   0 1 2 6
+# Short-Description: Rsyphon's daemon for real-time monitoring of client installations
+# Description: This daemon listen to a specific port (default is 8181) and
+#              collects informations periodically sent by clients using
+#              plain TCP/IP connections.
+### END INIT INFO
+
+PNAME=rsmonitor
+PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:
+PIDFILE=/var/run/rsmonitor.pid
+
+# Comment these lines if you want to disable logging
+# for this service.
+LOGFILE=/var/log/rsyphon/rsmonitor.log
+
+# Can be 1 (error), 2 (warning) or 3 (debug).
+# default: warning.
+LOGLEVEL=2
+
+case "$1" in
+  start)
+    echo -n "Starting Rsyphon's installation monitoring: rsmonitor... "
+    if [ -e $PIDFILE ]; then
+        echo -e "failed.\nPID file $PIDFILE exists.  Must be already running."
+        exit 1
+    fi
+    # Check if ithreads are supported.
+    if perl -e 'use Config; exit ($Config{useithreads} ne "define");'; then
+        RS_MONITOR=`which rsmonitor 2>/dev/null`
+    else
+        RS_MONITOR="`which perl 2>/dev/null` -Mforks -Mforks::shared `which rsmonitor`"
+        cat << EOF
+
+WARNING: your version of perl doesn't support ithreads!
+
+It's strongly suggested to use a threaded perl (built with 'useithreads').
+
+Falling back to thread emulation via perl-forks...
+EOF
+    fi
+    if [ ! -z $LOGFILE ]; then
+        $RS_MONITOR --log $LOGFILE --log_level $LOGLEVEL 0>/dev/null >&0 2>&0 &
+    else
+        $RS_MONITOR 0>/dev/null >&0 2>&0 &
+    fi
+    if ps -p $! >/dev/null 2>&1; then
+        echo "ok."
+    else
+        echo "failed."
+        exit 1
+    fi
+    ;;
+  stop)
+    echo -n "Stopping Rsyphon's installation monitoring: rsmonitor... "
+    [ -f $PIDFILE ] && kill `cat $PIDFILE` >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        rm -f $PIDFILE
+        echo "stopped."
+        exit 0
+    else
+        rm -f $PIDFILE
+        echo "failed."
+        exit 1
+    fi
+    ;;
+  status)
+    echo -n "Status of Rsyphon's installation monitoring: rsmonitor... "
+    ([ -f $PIDFILE ] && ps -p `cat $PIDFILE` >/dev/null 2>&1 && echo "running." && exit 0) || (echo "not running." && exit 1)
+    ;;
+  force-reload|restart)
+    sh $0 stop
+    sh $0 start
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|status|restart}"
+    exit 1
+    ;;
+esac
+

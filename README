@@ -1,0 +1,42 @@
+#
+#  "Rsyphon"
+#
+
+
+First Things First
+--------------------------------------------------------------------------------
+All documentation is in /usr/share/doc/rsyphon-*
+
+o Read at _least_ the HOWTO section of the manual:
+
+  1)  "cd /usr/share/doc/rsyphon-*/manual/"
+  2)  "lynx html/index.html"
+    or
+      "mozilla html/index.html"
+    or
+      "evince rsyphon-manual.pdf"
+    or
+      "acroread rsyphon-manual.pdf"
+
+o See the FAQ section of the manual if you still have questions.
+o See the Troubleshooting section of the manual if you have problems.
+o If you still have questions, visit http://wiki.rsyphon.org.
+
+
+Installing Rsyphon Packages (recommended)
+--------------------------------------------------------------------------------
+If you're looking in here to find out how to install Rsyphon, please 
+visit the following web page for instructions on installing pre-built 
+Rsyphon packages for Debian or RPM based distributions:
+
+    http://sourceforge.net/project/showfiles.php?group_id=259
+
+
+Building and/or Installing Rsyphon from Source
+--------------------------------------------------------------------------------
+Rsyphon should build and operate on most any distribution.  If you
+must build Rsyphon yourself, start by reviewing the make help.
+
+Literally -- just type it in and hit enter:  "make help"
+
+

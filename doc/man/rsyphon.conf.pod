@@ -1,0 +1,114 @@
+=head1 NAME
+
+rsyphon.conf - configuration file for Rsyphon server
+
+=head1 DESCRIPTION
+
+The rsyphon.conf file residing in the /etc/rsyphon directory
+controls the default behavior of commands run on the Rsyphon
+server.  It is parsed by the AppConfig Perl module, and uses simple
+name/value pairs.
+
+=head1 FILE FORMAT
+
+The follow stanzas exist in the rsyphon.conf file
+
+=over 4
+
+=item B<DEFAULT_IMAGE_DIR>
+
+The directory where images are stored.  The default set in the
+file is I</var/lib/rsyphon/images>.  If your image repository
+exists else where you can set this variable to change that.  This
+variable is used by I<rsgetimage> to determine where to put the created
+images.
+
+=item B<DEFAULT_OVERRIDE_DIR>
+
+The directory where overrides are stored.  The default set in the
+file is I</var/lib/rsyphon/overrides>.  Overrides can be used to
+manage differences from images. A typical use is to customize a
+"vanilla" image adding some additional packages, but they are commonly
+used to store and distribute configuration files by I<rspushoverrides>.
+See also I<rsclusterconfig>.
+
+=item B<AUTOINSTALL_SCRIPT_DIR>
+
+The directory where autoinstall scripts are stored.  The default set
+in the file is I</var/lib/rsyphon/scripts>.  This is use by
+I<rsmkautoinstallscript> to determine where the autoinstall script for
+an image should be created.  It is also used by I<rsaddclients>, and
+I<rsclusterconfig>to determine where the client scripts should be
+created.
+
+=item B<AUTOINSTALL_BOOT_DIR>
+
+The top level directory where the boot kernel, ramdisk, and other
+architecture specific utilities exist.  The installed default for this
+is I<$PREFIX/share/rsyphon>, where $PREFIX is the installed
+prefix for all the Rsyphon tools.  In this directory will exist a
+number of architecture specific directories of the format $ARCH-boot
+(e.g. i386-boot, ia64-boot, etc.).  The variable is used by
+I<rsmkautoinstallcd>, I<rsmkautoinstalldisk> and I<rsmkbootserver>.
+
+=item B<RSYNCD_CONF>
+
+The local of the I<rsyncd.conf> file associated with Rsyphon.
+The installed default is I</etc/rsyphon/rsyncd.conf>.  The variable
+is used by I<rsmkrsyncd_conf> that can be used to automatically create
+a valid I</etc/rsyphon/rsyncd.conf> for Rsyphon.
+
+=item B<RSYNCD_STUB_DIR>
+
+The path to the directory where rsync stub files are stored. There is a
+stub for each image plus an header and a footer stub.  Stubs are used by
+I<rsmkrsyncd_conf> to create the file I</etc/rsyphon/rsyncd.conf>.
+Usually you shouldn't care about this file, it's only used internally by
+Rsyphon.
+
+=item B<TFTP_DIR>
+
+The directory where tftp and net-boot files are stored. The default path
+is I</var/lib/tftpboot>.
+
+=item B<NET_BOOT_DEFAULT>
+
+This setting affects rsyphon-server-netbootmond.  If set to "local",
+then after successful completion of an install, a client's net boot
+configuration is modified to ensure future boots will happen from the
+client's local disk.  NET_BOOT_DEFAULT can be set to local or net.  Be
+sure to restart rsyphon-server-netbootmond after changing this
+setting (I</etc/init.d/rsyphon-server-netbootmond restart>).
+
+See I<rsnetbootmond(8)> for more details.
+
+=item B<AUTOINSTALL_TARBALL_DIR>
+
+The directory to store temporary tarball files distributed via BitTorrent.
+The default is I</var/lib/rsyphon/tarballs>.
+
+=item B<AUTOINSTALL_TORRENT_DIR>
+
+The directory to store temporary torrent files distributed via BitTorrent.
+The default is I</var/lib/rsyphon/torrents>.
+
+=item B<CONFIG_DIR>
+
+The directory this file resides in.
+
+=back
+
+=head1 BUGS
+
+B<CONFIG_DIR> seems redundant, as you can't parse the file unless you
+know where it is.
+
+=head1 SEE ALSO
+
+The Rsyphon Manual.
+
+=head1 AUTHORS
+
+Rsyphon is maintained by Brian Finley (brian@baldguysoftware.com)
+
+This man page created by Sean Dague (sean@dague.net)

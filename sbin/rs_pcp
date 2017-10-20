@@ -1,0 +1,257 @@
+#!/usr/bin/perl -w
+#
+#  "Rsyphon"
+#
+#  Copyright (C) 2005 Andrea Righi <a.righi@cineca.it>
+
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use strict;
+use Getopt::Long;
+use Rsyphon::HostRange;
+
+my $VERSION = "SYSTEMIMAGER_VERSION_STRING";
+
+my $program_name = "rspcp";
+
+my $version_info = << "EOF";
+$program_name (part of Rsyphon) v$VERSION
+
+Copyright (C) 2006 Andrea Righi <a.righi\@cineca.it>
+
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOF
+
+my $help_info = $version_info . <<"EOF";
+
+Usage: $program_name --hosts host_range [OPTIONS]... file_src1... file_dest
+
+Options: (options can be presented in any order and can be abbreviated)
+ --help, -h             Display this output.
+
+ --version, -V          Display version and copyright information.
+
+ --verbose, -v          Display verbose informations.
+
+ --dry-run, -d          Only show what would have been transferred
+                        without really distributing files.
+
+ --checksum, -c         Update only files with changed content. Mostly
+                        useful with -d to see which file will be altered
+                        because it's often slower than default.
+
+ --max, -m=NUM          Set the maximum number of concurrent copies
+                        to NUM (default=32).
+
+ --hosts, -n=HOST_LIST  List of target nodes. List can be separated by
+                        comma, spaces or new line and can include
+                        ranges or host groups
+                        (e.g. "node001-node256 node300,Login,Storage").
+                        Host groups must be defined by rsclusterconfig(8).
+                        
+
+ --hosts-file, -f=FILE  File that contains the list of the target host.
+                        Every line can include one or more ranges or
+                        host groups
+                        (e.g. "node001-node256 node300,Login,Storage").
+                        Host groups must be defined by rsclusterconfig(8).
+
+ --timeout, -t=NUM      Set the timeout of the sessions (default=15s).
+
+ --ssh-user, -l=USER    Copy the file as user USER on the target
+                        machines.
+
+EOF
+
+Getopt::Long::Configure("posix_default");
+Getopt::Long::Configure("no_gnu_compat");
+Getopt::Long::Configure("bundling");
+
+GetOptions(
+	"help|h"		=> \my $help,
+	"version|V"		=> \my $version,
+	"verbose|v"		=> \my $verbose,
+	"max|m=i"		=> \my $concurrents,
+	"dry-run|d"		=> \my $dry_run,
+	"checksum|c"		=> \my $checksum,
+	"hosts|n=s"		=> \my $hostlist,
+	"hosts-file|f=s"	=> \my $hostlist_file,
+	"timeout|t=i"		=> \my $timeout,
+	"ssh-user|l=s"		=> \my $ssh_user,
+) or die("$help_info");
+
+### BEGIN evaluate commad line options ###
+
+if ($help) {
+	print "$help_info";
+	exit(0);
+}
+
+if ($version) {
+	print "$version_info";
+	exit(0);
+}
+
+if ($verbose) {
+	$verbose = 'v';
+} else {
+	$verbose = '';
+}
+
+if ($dry_run) {
+	$dry_run = '--dry-run';
+} else {
+	$dry_run = '';
+}
+
+if ($checksum) {
+	$checksum = '--checksum';
+} else {
+	$checksum = '';
+}
+
+
+my $source;
+my $target;
+if (@ARGV) {
+	$target = pop(@ARGV);
+	$source = join(' ', @ARGV);
+}
+unless ($source) {
+	die("error: no source defined!\nTry \"--help\" for more options.\n");
+}
+unless ($target) {
+	die("error: undefined destination!\nTry \"--help\" for more options.\n");
+}
+
+# Evaluate target hosts.
+my @hosts = ();
+if ($hostlist_file) {
+	# Read input file.
+	open(IN, '<', $hostlist_file) ||
+		die("error: could't read $hostlist_file!\n");
+	$hostlist .= ' ' . join(' ', <IN>);
+	close(IN);
+}
+if ($hostlist) {
+	# Expand host groups and host ranges.
+	@hosts = Rsyphon::HostRange::expand_groups($hostlist);
+}
+unless (@hosts) {
+	die("error: no host defined!\nTry \"--help\" for more options.\n");
+}
+
+unless ($timeout) {
+	$timeout = 15;
+}
+
+unless ($ssh_user) {
+	$ssh_user = $ENV{'USER'};
+}
+
+if ($concurrents) {
+	$Rsyphon::HostRange::concurrents = $concurrents;
+}
+
+### END evaluate command line options ###
+
+# Use the following ssh options.
+my $ssh_opts = "-x -o BatchMode=yes -l $ssh_user";
+my $rsync_opts = "-aHISz$verbose $dry_run $checksum --numeric-ids --timeout=$timeout --rsh='ssh $ssh_opts'";
+
+# Main program.
+@hosts = map { $_ .= ":$target" } @hosts;
+Rsyphon::HostRange::thread_pool_spawn('rsync', $rsync_opts . ' ' . $source, '', @hosts);
+
+__END__
+
+=head1 NAME
+
+rspcp - Rsyphon Parallel Copy
+
+=head1 SYNOPSIS
+
+rspcp --hosts host_range [OPTIONS]... src1 src2 ... dest
+
+=head1 DESCRIPTION
+
+B<rspcp> concurrently copies files to multiple nodes via rsync.
+
+=head1 OPTIONS
+
+=over 8
+ 
+=item B<--help | -h>
+
+Display a short help.
+
+=item B<--version | -V>
+
+Display version and copyright information.
+
+=item B<--verbose | -v>
+
+Display verbose informations.
+
+=item B<--dry-run | -d>
+
+Only show what would have been transferred without really distributing files.
+
+=item B<--checksum | -c>
+
+Update only files with changed content (force checksum usage for all the
+files on the sender). Receiver compares the checksums of each file (if
+it exists and has the same size as the sender counterpart). Mostly
+useful with -d to see which file will be altered because it's often slower
+than default.
+
+=item B<--max | -m NUM>
+
+Set the maximum number of concurrent copies to NUM (default=32).
+
+=item B<--hosts | -n HOST_LIST>
+
+List of target nodes. List can be separated by comma, spaces or new line and can
+include ranges or host groups (e.g. "node001-node256 node300,Login,Storage").
+Host groups must be defined by rsclusterconfig(8).
+
+=item B<--hosts-file | -f FILE>
+
+File that contains the list of the target hosts. Every line can include one or
+more ranges or host groups (e.g. "node001-node256 node300,Login,Storage").
+Host groups must be defined by rsclusterconfig(8).
+
+=item B<--timeout | -t NUM>
+
+Set the timeout of the rsync sessions (default=15s).
+
+=item B<--ssh-user | -l USER>
+
+Copy the file as user USER on the target machines.
+
+=back
+
+=head1 SEE ALSO
+
+rsyphon(8), rspsh(8), rspushinstall(8), rsclusterconfig(8)
+
+=head1 AUTHOR
+
+Andrea Righi <a.righi@cineca.it>.
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2003 by Andrea Righi <a.righi@cineca.it>.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut
+

@@ -1,0 +1,84 @@
+Source: rsyphon
+Section: admin
+Priority: optional
+Maintainer: william kennedy <william@a9group.net>
+Build-Depends: bc, bzip2, debhelper (>= 4.0.0), flex, gettext, groff-base, libdevmapper-dev, libpopt-dev, libtool, libreadline-dev, libssl-dev,  python-dev, rsync, texinfo, uuid-dev, wget, zlib1g-dev, tofrodos | sysutils (<= 2.0.0-1), ncurses-dev, dos2unix, binutils-dev, quilt, libpam-dev, pkg-config, libglib2.0-dev, gperf
+Build-Conflicts: libc-pic
+Build-Depends-Indep: docbook-to-man, docbook-utils
+Standards-Version: 3.7.2
+
+Package: rsyphon-server
+Architecture: all
+Depends: ${perl:Depends}, binutils, debianutils (>= 1.7), dosfstools, libappconfig-perl, libxml-parser-perl, libxml-simple-perl, genisoimage | mkisofs, mtools, rsync, systemconfigurator (>= 2.2.11), rsyphon-boot-alpha-standard | rsyphon-boot-i386-standard | rsyphon-boot-ia64-standard | rsyphon-boot-parisc-standard | rsyphon-boot-ppc64-iSeries-standard | rsyphon-boot-ppc64-ps3-standard | rsyphon-boot-ppc64-standard | rsyphon-boot-ppc64ydl-standard | rsyphon-boot-ppc-standard | rsyphon-boot-amd64-standard, rsyphon-common (= ${source:Version})
+Recommends: isc-dhcp-server | dhcp3-server | dhcp, syslinux, tftp-hpa | atftp, tftpd-hpa | atftpd, openbsd-inetd | xinetd, update-inetd
+Description: Automate GNU/Linux installs and upgrades over a network
+ Rsyphon is a set of utilities for installing GNU/Linux software images to
+ clients machines over the network.  Images are stored in flat files on the
+ server, making updates easy.  The rsync protocol is used for transfers,
+ making updates efficient.
+ .
+ The syslinux package should be installed on servers that will be creating
+ bootable media for x86 clients.
+
+Package: rsyphon-client
+Architecture: all
+Depends: ${perl:Depends}, file, rsync, netcat, rsyphon-initrd-template-alpha | rsyphon-initrd-template-i386 | rsyphon-initrd-template-ia64 | rsyphon-initrd-template-parisc | rsyphon-initrd-template-ppc64-iSeries | rsyphon-initrd-template-ppc64-ps3 | rsyphon-initrd-template-ppc64 | rsyphon-initrd-template-ppc64ydl | rsyphon-initrd-template-ppc | rsyphon-initrd-template-amd64, rsyphon-common (= ${source:Version}), systemconfigurator (>= 2.2.11)
+Description: Utilities for creating an image and upgrading client machines
+ Rsyphon is a set of utilities for installing GNU/Linux software images to
+ clients machines over the network.  Images are stored in flat files on the
+ server, making updates easy.  The rsync protocol is used for transfers, making
+ updates efficient.
+ .
+ This package contains utilities for updating a client's image from the
+ server, and preparing a client for having its image fetched by the server.
+
+Package: rsyphon-common
+Architecture: all
+Depends: ${perl:Depends}, rsync
+Description: Utilities and libraries common to both the server and client
+ Rsyphon is a set of utilities for installing GNU/Linux software images to
+ clients machines over the network.  Images are stored in flat files on the
+ server, making updates easy.  The rsync protocol is used for transfers, making
+ updates efficient.
+ .
+ This package contains files common to both the rsyphon client and server.
+
+Package: rsyphon-doc
+Section: doc
+Architecture: all
+Suggests: rsyphon-server
+Description: Manual and other documentation
+ Rsyphon is a set of utilities for installing GNU/Linux software images to
+ clients machines over the network.  Images are stored in flat files on the
+ server, making updates easy.  The rsync protocol is used for transfers,
+ making updates efficient.
+ .
+ This package contains documentation for Rsyphon.
+
+Package: rsyphon-server-flamethrowerd
+Architecture: all
+Depends: rsyphon-server (>=3.6.3), flamethrower
+Description: Rsyphon boot binaries for ${misc:Package-Arch} client nodes
+ Rsyphon is a set of utilities for installing GNU/Linux software images to
+ client machines over the network.  Images are stored in flat files on the
+ server, making updates easy.  The rsync protocol is used for transfers,
+ making updates efficient.
+ .
+ This package adds support for doing multicast installations.  Multicast
+ scales very well, allowing for the installation of hundreds of clients
+ at the same time.  Some tuning is required for optimal performance.
+ .
+ This release requires that your client has enough memory to hold a copy
+ of the system image.
+
+Package: rsyphon-server-bittorrent
+Architecture: all
+Depends: rsyphon-server (>=3.8.0-1)
+Description: BitTorrent transport to distribute Rsyphon images
+ Rsyphon is a set of utilities for installing GNU/Linux software images to
+ clients machines over the network.  Images are stored in flat files on the
+ server, making updates easy.  The rsync protocol is used for transfers, making
+ updates efficient.
+ .
+ The bittorrent package allows you to use the BitTorrent protocol to perform
+ installations.

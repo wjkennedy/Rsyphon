@@ -1,0 +1,250 @@
+#!/usr/bin/make -f
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# Some root tools are probably needed to build Rsyphon packages, so
+# explicitly add the right paths here.
+export PATH := $(PATH):/sbin:/usr/sbin:/usr/local/sbin
+
+PKG = rsyphon
+VERSION = $(shell dpkg-parsechangelog | grep ^Version: | \
+                  cut -d " " -f 2)
+BUILD_DIR = .
+UPSTREAM_TARBALL = $(PKG)_$(VERSION).tar.gz
+
+ARCH = $(shell dpkg --print-architecture)
+UNAME_ARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
+
+# Follows is a set of arch manipulations to distinguish between ppc types
+ifeq ($(UNAME_ARCH),ppc64)
+# Check if machine is Playstation 3
+IS_PS3 = $(shell grep -q PS3 /proc/cpuinfo && echo 1)
+ifeq ($(IS_PS3),1)
+        ARCH = ppc64-ps3
+	UNAME_ARCH = ppc64-ps3
+else
+        IS_PPC64 := 1
+        ifneq ($(shell ls /proc/iSeries 2>/dev/null),)
+                ARCH = ppc64-iSeries
+		UNAME_ARCH = ppc64-iSeries
+        endif
+endif
+endif
+
+BOOTPKG = $(PKG)-boot-$(ARCH)-standard
+INITRD_TEMPLATE_PKG = $(PKG)-initrd-template-$(ARCH)
+
+# for debhelper; we can't just say -N$(BOOTPKG) because that'd cause us to
+# build empty boot packages for the other archs
+NON_BOOT_PKGS := -p $(PKG)-client \
+                 -p $(PKG)-common \
+                 -p $(PKG)-doc \
+                 -p $(PKG)-server \
+                 -p $(PKG)-server-flamethrowerd \
+                 -p $(PKG)-server-bittorrent
+
+BOOTARCHS = amd64
+
+PATCHES=$(sort $(shell find $(CURDIR)/debian/patches -name "*.patch"))
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+	@cd $(BUILD_DIR) && \
+	    $(foreach patch, $(PATCHES), \
+	      echo -n Applying `basename $(patch)`... && cat $(patch) | \
+	      patch -s -p1 && echo done. &&) /bin/true
+
+	cd $(BUILD_DIR) && ./configure
+	touch configure-stamp
+
+copy_changelog:	$(BUILD_DIR)/changelog
+
+$(BUILD_DIR)/changelog:	$(BUILD_DIR)/CHANGE.LOG
+	cd $(BUILD_DIR) && cp CHANGE.LOG changelog
+
+build: build-indep
+
+build-indep:	cleandeb configure-stamp build-indep-stamp copy_changelog
+
+build-indep-stamp:
+	# the pdf build reports a failure, but the result looks fine...
+	-$(MAKE) -C $(BUILD_DIR) docs USE_SGMLTOOLS=1
+	touch build-indep-stamp
+
+build-arch:	cleandeb configure-stamp build-arch-stamp copy_changelog
+
+build-arch-stamp:
+	dh_testdir
+	dh_testroot
+
+	$(MAKE) -C $(BUILD_DIR) binaries MKCRAMFS=/usr/sbin/mkcramfs
+
+	touch build-arch-stamp
+
+test:	build-arch-stamp
+
+debian/control:	debian/control.in debian/control.arch.in
+	# generate control file suitable for the boot package
+	# substvars don't seem to work, so we hack around it with sed.
+	sed -e 's/$${misc\:Package\-Arch}/$(ARCH)/g' -e 's/$${source\:Version}/$(VERSION)/g' \
+	  < debian/control.in > debian/control
+	for arch in $(BOOTARCHS); do \
+	  sed -e "s/\$${misc\:Package\-Arch}/$$arch/g" \
+	         debian/control.arch.in >> debian/control; \
+        done
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-indep-stamp build-arch-stamp configure-stamp
+
+	# Add here commands to clean up after the build process.
+	#rm -rf $(BUILD_DIR)
+	cd $(CURDIR)/debian && \
+	  rm -rf $(PKG)-client $(PKG)-server $(PKG)-common $(PKG)-doc \
+	  $(BOOTPKG) $(INITRD_TEMPLATE_PKG) \
+	  $(PKG)-boot $(PKG)-server-flamethrowerd $(PKG)-server-bittorrent
+	rm -f debian/$(PKG)-server.init
+	rm -f debian/$(PKG)-server-flamethrowerd.init
+	rm -f debian/$(PKG)-server-bittorrent.init
+	dh_clean
+
+install-arch:	build-arch
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+	cd $(CURDIR)/debian && mkdir -p $(BOOTPKG) $(INITRD_TEMPLATE_PKG)
+
+	# Add here commands to install the packages
+	$(MAKE) -C $(BUILD_DIR) install_binaries \
+	  DESTDIR=$(CURDIR)/debian/$(BOOTPKG)
+
+	# Remove forbidden special files from $(BOOTPKG). This files will be
+	# added using the post-install deb script:
+	#
+	# rsyphon-initrd-template-$(ARCH).postinst
+	#
+	cd $(CURDIR)/debian/$(BOOTPKG)/usr/share/rsyphon/boot/$(UNAME_ARCH)/standard/initrd_template/dev && \
+		rm -f tty1 && \
+		rm -f tty2 && \
+		rm -f tty3 && \
+		rm -f tty4 && \
+		rm -f tty5 && \
+		rm -f tty6 && \
+		rm -f console && \
+		rm -f null && \
+		rm -f zero 
+
+	# Copy the needed files into the initrd_template package.
+	mkdir -p $(CURDIR)/debian/$(INITRD_TEMPLATE_PKG)/usr/share/rsyphon/boot/$(UNAME_ARCH)/standard
+	mv $(CURDIR)/debian/$(BOOTPKG)/usr/share/rsyphon/boot/$(UNAME_ARCH)/standard/initrd_template \
+	   $(CURDIR)/debian/$(INITRD_TEMPLATE_PKG)/usr/share/rsyphon/boot/$(UNAME_ARCH)/standard
+
+install-indep:	build-indep
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+	cd $(CURDIR)/debian && mkdir -p $(PKG)-client \
+	  $(PKG)-server $(PKG)-common $(PKG)-doc
+
+	# Add here commands to install the packages
+	$(MAKE) -C $(BUILD_DIR) install_client \
+	  DESTDIR=$(CURDIR)/debian/$(PKG)-client
+	$(MAKE) -C $(BUILD_DIR) install_server \
+	  DESTDIR=$(CURDIR)/debian/$(PKG)-server
+
+	# these are installed properly by dh_installinit later
+	rm -rf $(CURDIR)/debian/$(PKG)-server/etc/init.d
+
+	$(MAKE) -C $(BUILD_DIR) install_common \
+	  DESTDIR=$(CURDIR)/debian/$(PKG)-common
+
+	$(MAKE) -C $(BUILD_DIR) install_docs \
+	  DESTDIR=$(CURDIR)/debian/$(PKG)-doc
+
+	mkdir -p $(CURDIR)/debian/$(PKG)-server-flamethrowerd/etc/rsyphon
+	mv $(CURDIR)/debian/$(PKG)-server/etc/rsyphon/flamethrower.conf \
+	  $(CURDIR)/debian/$(PKG)-server-flamethrowerd/etc/rsyphon/
+	
+	# prepare the bittorrent package
+	mkdir -p $(CURDIR)/debian/$(PKG)-server-bittorrent/etc/init.d
+	mkdir -p $(CURDIR)/debian/$(PKG)-server-bittorrent/etc/rsyphon
+	mkdir -p $(CURDIR)/debian/$(PKG)-server-bittorrent/usr/sbin
+	mkdir -p $(CURDIR)/debian/$(PKG)-server-bittorrent/var/lib/rsyphon/tarballs
+	mkdir -p $(CURDIR)/debian/$(PKG)-server-bittorrent/var/lib/rsyphon/torrents
+	mkdir -p $(CURDIR)/debian/$(PKG)-server-bittorrent/usr/share/man/man8
+	mv $(CURDIR)/debian/$(PKG)-server/etc/rsyphon/bittorrent.conf \
+		$(CURDIR)/debian/$(PKG)-server-bittorrent/etc/rsyphon
+	mv $(CURDIR)/debian/$(PKG)-server/usr/sbin/rsinstallbtimage \
+		$(CURDIR)/debian/$(PKG)-server-bittorrent/usr/sbin
+	mv $(CURDIR)/debian/$(PKG)-server/usr/share/man/man8/rsinstallbtimage.8.gz \
+		$(CURDIR)/debian/$(PKG)-server-bittorrent/usr/share/man/man8
+
+# Build architecture-dependent files here.
+binary-arch: build-arch install-arch
+	dh_testdir -p$(BOOTPKG) -p$(INITRD_TEMPLATE_PKG)
+	dh_testroot -p$(BOOTPKG) -p$(INITRD_TEMPLATE_PKG)
+	dh_installdocs -p$(BOOTPKG) -p$(INITRD_TEMPLATE_PKG)
+	dh_installchangelogs -p$(BOOTPKG) -p$(INITRD_TEMPLATE_PKG)
+	#dh_link -p$(BOOTPKG) -p$(INITRD_TEMPLATE_PKG)
+	#dh_strip -p$(BOOTPKG) -p$(INITRD_TEMPLATE_PKG)
+	#dh_compress -p$(BOOTPKG) -p$(INITRD_TEMPLATE_PKG)
+	#dh_fixperms -p$(BOOTPKG) -p$(INITRD_TEMPLATE_PKG)
+	dh_installdeb -p$(BOOTPKG) -p$(INITRD_TEMPLATE_PKG)
+	#dh_perl -p$(BOOTPKG) -p$(INITRD_TEMPLATE_PKG)
+	dh_gencontrol -p$(BOOTPKG) -p$(INITRD_TEMPLATE_PKG)
+	dh_md5sums  -p$(BOOTPKG) -p$(INITRD_TEMPLATE_PKG)
+	dh_builddeb -p$(BOOTPKG) -p$(INITRD_TEMPLATE_PKG)
+
+# Build architecture-independent files here.
+binary-indep: build-indep install-indep
+	dh_testdir $(NON_BOOT_PKGS)
+	dh_testroot $(NON_BOOT_PKGS)
+#	dh_installdebconf
+	dh_installdocs $(NON_BOOT_PKGS)
+	dh_installexamples -p$(PKG)-server $(BUILD_DIR)/doc/examples/*
+
+	cp $(BUILD_DIR)/etc/init.d/$(PKG)-server-rsyncd \
+	  ./debian/$(PKG)-server.init
+	dh_installinit --no-start -p$(PKG)-server --init-script=$(PKG)-server-rsyncd
+
+	cp $(BUILD_DIR)/etc/init.d/$(PKG)-server-netbootmond \
+	  ./debian/$(PKG)-server.init
+	dh_installinit --no-start -p$(PKG)-server --init-script=$(PKG)-server-netbootmond
+
+	cp $(BUILD_DIR)/etc/init.d/$(PKG)-server-monitord \
+	  ./debian/$(PKG)-server.init
+	dh_installinit --no-start -p$(PKG)-server --init-script=$(PKG)-server-monitord
+
+	cp $(BUILD_DIR)/etc/init.d/$(PKG)-server-flamethrowerd \
+	  ./debian/$(PKG)-server-flamethrowerd.init
+	dh_installinit --no-start -p$(PKG)-server-flamethrowerd \
+	  --init-script=$(PKG)-server-flamethrowerd
+
+	cp $(BUILD_DIR)/etc/init.d/$(PKG)-server-bittorrent \
+		./debian/$(PKG)-server-bittorrent.init
+	dh_installinit --no-start -p$(PKG)-server-bittorrent \
+		--init-script=$(PKG)-server-bittorrent
+
+	dh_installchangelogs $(NON_BOOT_PKGS)
+	dh_link $(NON_BOOT_PKGS)
+	dh_strip $(NON_BOOT_PKGS)
+	dh_compress $(NON_BOOT_PKGS)
+	dh_fixperms $(NON_BOOT_PKGS)
+	dh_installdeb $(NON_BOOT_PKGS)
+	dh_perl $(NON_BOOT_PKGS)
+	dh_shlibdeps $(NON_BOOT_PKGS)
+	dh_gencontrol $(NON_BOOT_PKGS)
+	dh_md5sums  $(NON_BOOT_PKGS)
+	dh_builddeb $(NON_BOOT_PKGS)
+
+binary: binary-indep binary-arch
+.PHONY: build cleandeb clean binary-indep binary-arch binary install configure

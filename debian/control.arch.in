@@ -1,0 +1,28 @@
+
+Package: rsyphon-boot-${misc:Package-Arch}-standard
+Architecture: all
+Recommends: rsyphon-server
+Conflicts: rsyphon-bin-${misc:Package-Arch}, rsyphon-kernel-${misc:Package-Arch}, rsyphon-initrd-${misc:Package-Arch}, rsyphon-boot-standard-${misc:Package-Arch}, rsyphon-ssh-${misc:Package-Arch}, rsyphon-server (<< 3.8.0)
+Replaces: rsyphon-bin-${misc:Package-Arch}, rsyphon-kernel-${misc:Package-Arch}, rsyphon-initrd-${misc:Package-Arch}, rsyphon-boot-standard-${misc:Package-Arch}, rsyphon-ssh-${misc:Package-Arch}
+Description: Rsyphon boot binaries for ${misc:Package-Arch} client nodes
+ Rsyphon is a set of utilities for installing GNU/Linux software images to
+ client machines over the network.  Images are stored in flat
+ files on the server, making updates easy.  The rsync protocol is used for
+ transfers, making updates efficient.
+ .
+ This package contains the standard flavor of the boot files for installing
+ ${misc:Package-Arch} machines.  This package should be installed on the image server.
+
+Package: rsyphon-initrd-template-${misc:Package-Arch}
+Architecture: all
+Recommends: rsyphon-server | rsyphon-client
+Conflicts: rsyphon-bin-${misc:Package-Arch}, rsyphon-kernel-${misc:Package-Arch}, rsyphon-initrd-${misc:Package-Arch}, rsyphon-boot-standard-${misc:Package-Arch}, rsyphon-ssh-${misc:Package-Arch}, rsyphon-server (<< 3.8.0), rsyphon-client (<< 3.8.0)
+Description: Rsyphon initrd template for ${misc:Package-Arch} client nodes
+ Rsyphon is a set of utilities for installing GNU/Linux software images to
+ client machines over the network.  Images are stored in flat
+ files on the server, making updates easy.  The rsync protocol is used for
+ transfers, making updates efficient.
+ .
+ This package contains the root of the initrd to create a custom initrd.img for
+ ${misc:Package-Arch} machines, based on the UYOK (UseYourOwnKernel) feature of
+ Rsyphon.  This package should be installed on the golden client.

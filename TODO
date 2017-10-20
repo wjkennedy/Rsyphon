@@ -1,0 +1,205 @@
+#
+#  vi:set filetype=conf tw=80:
+#
+
+- Handle this error:
+
+  ERROR: unsupported kernel 3.13.0-32-generic!
+  root@redmine:~/.ssh# 
+
+
+- create sbin/rslsclient
+
+    Concept: List names of clients and the images that they are targeted to
+    install.
+
+- find all systemconfigurator bits and update to postscript or other
+
+
+- When trying to complete the imaging, the SI master script needs to stop klogd
+  so that /a/proc and /a/ will umount cleanly (right now they get the device
+  busy msg)
+
+  - add entry to end of master script
+
+
+- When it's time to update the bittorrent client/server:
+    http://www.rahul.net/dholmes/ctorrent/ 
+
+- Ideas on initrd
+    - Use initrd on client system or server system as base
+        - Let the distros muck about with the auto-detect details and what not
+          -- they do a good job of that now
+        - Augment distro initrd with Rsyphon specific init scripts
+        - Capture binaries from well known distros and package
+            - Start with Ubuntu (what I'm running)
+            - Simply modify existing make scripts
+
+    - Do build in a Dokker container?  Provide container for anyone who wants to
+      use it?
+
+    - Dracut or mkinitramfs or (rhel5 tool)
+        - target as alternate location
+
+    - Dracut has an option to include an overlay directory in the initrd:
+        http://people.redhat.com/harald/dracut-rhel6.html
+
+
+Add a "Features" section to the website:
+
+    - Image based provisioning of Linux for sites with a single machine or
+      thousands of machines.
+    - Supported distributions include: all
+    - Supported architectures include:
+        - x86_64
+        - i386
+        - ia64
+        - parisc
+        - alpha
+        - ppc
+        - ppc64
+        - ppc64-iSeries
+        - ppc64-ps3 (Sony PS3)
+    - Un-Supported architectures on which is has been reported to run include:
+        - s390x
+    - Disk label types supported include:
+        - GPT
+        - msdos
+    - Software RAID support
+    - LVM support
+        - including LVM on top of Software RAID
+    - Filesystems supported include:
+        - msdos, vfat
+        - ext2, ext3, ext4
+        - reiserfs
+        - jfs
+        - xfs
+        - swap
+    - Transport protocols include:
+        - rsync
+            - default and simplest
+        - bittorrent
+            - best choice at scale
+        - rsync over SSH 
+            - fully encrypted operation supported
+        - multicast
+            - no longer recommended -- see bittorrent
+
+Handle firmware (include like modules) if needed
+
+Have a single init script.  Start services based on their settings in /etc/default/rsyphon or /etc/rsyphon/initscript.conf
+
+Move _all_ source code into si.trunk/src
+
+move _all_ *.rul files into make.d
+
+Verify we have an "*_install" target for all initrd packages
+
+Move ./initrd_dir/make.d/*.rul files into ./make.d/
+
+Find some way to add color to logmsg, so that function names can be a different color from the output they produce...
+
+mklibs.bef -- review output and re-direct -L towards locally built libs
+mknods -- review this and see if we can remove now that we're using udev
+
+
+Finley's new TODO list for Rsyphon
+---------------------------------------
+(2) Support grub2 (and other improvements)
+
+    * Thanks to Dennis Stam and Bas van der Vlies of SARA for their
+      notes (below w/my modifications) to help me along here
+
+        - Make sure init scripts for updated binaries come from the
+          binaries' packages
+        - xbusybox 1.16.1
+        - xparted 2.2+ needed for grub 2 so we can set the grub2 partition
+          flag
+        - xudev 157. So we could remove the hotplug software.
+          Autodetecting of hardware is better. 
+        - yNo insmod and my_modules anymore?  I'm thinking we should keep
+          this feature around in the mainstream Rsyphon code for now.
+        - kernel support with gpt labels needed for grub2 and upgrade to
+          2.6.33.3 and switch to cpio for initrd instead of cramfs. The
+          rsyphon standard kernel use a lot of deprecated options.
+        - changed bittorent client to aria2. Can handle more protocols:
+           * http://aria2.sourceforge.net/ and is completely written in
+             C++
+        - all filesystem tools are upgrade to a newer version.
+        - switched to udhcpc instead of dhclient. The former is included
+          standard in busybox.
+        - Further we completely removed the boel_binaries.tar.gz rsync
+          setup.  Our modules and utilities are all included in the
+          initrd.img. It is easier to upgrade to a new kernel.
+        - /etc/init.d/functions. A lot is removed or has been rewritten.
+        - the grub2 installations is handled in our post install script
+          for now
+
+
+(3.5) Make sure built libs are used and included, and not libs from the
+build system.  mklibs.bef invokations.
+
+(4) switch to udhcp
+
+----
+
+The prior TODO list for Rsyphon
+------------------------------------
+(8) Introduce a new command (rspower) to control the power of the clients
+    (turn on/off/reboot, etc.), see also: ipmitool, BMC.
+
+(8) Create a new module called Rsyphon::Monitor to implement all the common
+    monitoring functions.
+
+    Rename the monitoring commands as following:
+
+    - rsmonitord: Rsyphon monitoring daemon
+    - rsmonitor: console interface (dump clients.xml info to stdout in a simple
+      txt format)
+    - rsmonitorcurses: ncurses-based interface
+    - rsmonitortk: perl-Tk interface
+
+(7) Include mkrecoveryISO in the standard release.
+
+(5) Implement rsgetdebuginfo to generate a tar.gz containing all the system
+    informations that could help to debug user problems (rsyphon versions,
+    partitioning schema, kernel, distribution used, etc). In this way a user
+    that needs support can simply post the tarball to the list and we'll have
+    immediately an overview of the system.
+
+(4) Move all LVM info into the <lvm> section of autoinstallscript.conf.
+
+    - No longer store any lvm info in the <disk> and/or <raid> sections
+    - Collect PV info and store it in the <lvm_group> section
+        <lvm>
+          <lvm_group>
+            <pv device="/dev/sda1" />
+            <pv device="/dev/md0"  />
+            <pv device="/dev/md1"  />
+            <lv name="swap" size="524288K" />
+            <etc...>
+          </lvm_group>
+        </lvm>
+
+    - Need to modify:
+        - Server.pm
+        - Common.pm
+        - autoinstallscript.template
+
+(4) rsmonitortk improvements (thanks Bernard for the good suggestions):
+    - support multiple virtual console instances at the same time
+    - add a popup menu on the client entries to display detailed info
+      and perform special actions (like open virtual console, check
+      availability of the node, delete entry, etc)
+    - tabbed view for virtual console
+
+(4) Implement a GUI to perform all the common rsyphon operations
+
+(4) Implement pre/post-update scripts (to be ran with rsupdateclient)
+
+(2) Add a kernel-devel tree package, like those that ship with RedHat, 
+    Ubuntu, etc. There's just enough data to build boot-kernel modules 
+    against, but nothing else. 
+
+    Ie: kernel-headers. (Jeremy Siadal suggestion)
+

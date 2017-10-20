@@ -1,0 +1,249 @@
+#!/usr/bin/perl -w
+
+#
+#  "Rsyphon" 
+#
+#  Copyright (C) 1999-2004 Brian Elliott Finley
+#
+#  $Id$
+#
+#  2004.05.05 Brian Elliott Finley
+#  - Allow --update-script=yes  in addition to --force.
+#
+
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use Getopt::Long;
+use Rsyphon::Server;
+use Rsyphon::Common;
+use Rsyphon::Config;
+use vars qw($config $VERSION);
+
+my $config_dir = "/etc/rsyphon";
+
+### BEGIN parse the config file ###
+my $rsync_stub_dir = $config->rsync_stub_dir();
+unless ($rsync_stub_dir) {
+    die "FATAL: parameter RSYNC_STUB_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $autoinstall_script_dir = $config->autoinstall_script_dir();
+unless ($autoinstall_script_dir) {
+    die "FATAL: parameter AUTOINSTALL_SCRIPT_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $rsyncd_conf = $config->rsyncd_conf();
+unless ($rsyncd_conf) {
+    die "FATAL: parameter RSYNCD_CONF is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+### END parse the config file ###
+
+$VERSION="SYSTEMIMAGER_VERSION_STRING";
+$program_name = "rsmkautoinstallscript";
+$version_info = <<"EOF";
+$program_name (part of Rsyphon) v$VERSION
+    
+Copyright (C) 1999-2011 Brian Elliott Finley <brian\@thefinleys.com>
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOF
+
+$get_help = "\n       Try \"--help\" for more options.";
+
+$help_info = $version_info . <<"EOF";
+
+Usage: $program_name [OPTION]... -image IMAGENAME
+
+Options: (options can be presented in any order and may be abbreviated)
+ --help                 Display this output.
+
+ --version              Display version and copyright information.
+
+ --quiet                Don\'t print any output, just provide an 
+                        appropriate exit code.
+
+ --image IMAGENAME      Where IMAGENAME is the name of the image for 
+                        which you want to create a new autoinstall 
+                        script.
+
+ --overrides LIST       Where LIST is the comma separated list of the
+                        overrides that will be transferred to the clients
+                        when they will be imaged.
+
+ --script SCRIPTNAME    Where SCRIPTNAME is the base name to use for the 
+                        resultant autoinstall script.  If not specified,
+                        SCRIPTNAME defaults to IMAGENAME.
+
+ --update-script        Overwrite the \$image.master script, if it exists.
+
+ --force                Same as --update-script.
+
+ --config-file FILE     Use FILE to get autoinstall script configuration
+                        information.  Defaults to the 
+                        ./etc/rsyphon/autoinstallscript.conf file
+                        in the image.
+
+ --listing              Show each filename as it is copied over during
+                        install.  This setting increases the verbosity
+                        of the installation, and can be useful for
+                        debugging.
+
+                        WARNING:  This setting can dramatically slow
+                        down your auto-installs if you are using a slow
+                        console device (e.g. serial console).
+
+ --autodetect-disks     Try to detect available disks on the client instead
+                        of using devices from autoinstallscript.conf.
+
+The following options affect the autoinstall client after autoinstalling:
+
+ --ip-assignment METHOD    Where METHOD can be DHCP, STATIC, or REPLICANT.
+
+                DHCP
+                ----------------------------------------------------------------
+                A DHCP server will assign IP addresses to clients installed with
+                this image.  They may be assigned a different address each time.
+                If you want to use DHCP, but must ensure that your clients 
+                receive the same IP address each time, see \"man rsmkdhcpstatic\".
+
+                STATIC
+                ----------------------------------------------------------------
+                The IP address the client uses during autoinstall will be 
+                permanently assigned to that client.
+
+                REPLICANT
+                ----------------------------------------------------------------
+                Don\'t mess with the network settings in this image.  I\'m using
+                it as a backup and quick restore mechanism for a single machine.
+
+
+ --post-install ACTION     Where ACTION can be BEEP, REBOOT, SHUTDOWN, or KEXEC.
+
+                BEEP 
+                ----------------------------------------------------------------
+                Clients will beep incessantly after succussful completion of an
+                autoinstall.  (default)
+
+                REBOOT 
+                ----------------------------------------------------------------
+                Clients will reboot themselves after successful completion of 
+                an autoinstall.
+
+                SHUTDOWN 
+                ----------------------------------------------------------------
+                Clients will halt themselves after successful completion of an 
+                autoinstall.
+
+                KEXEC
+                ----------------------------------------------------------------
+                Clients will boot the kernels via kexec that were just installed
+                after successful completion of an autoinstall.
+
+Download, report bugs, and make suggestions at:
+http://rsyphon.org/
+EOF
+
+# Set some defaults. -BEF-
+my $ip_assignment_method = "dhcp";
+my $post_install = "beep";
+my $auto_install_script_conf;
+my $script_name;
+
+GetOptions( 
+    "help"              => \$help,
+    "version"           => \$version,
+    "quiet"             => \$quiet,
+    "image=s"           => \$image,
+    "overrides=s"       => \$overrides,
+    "script=s"          => \$script_name,
+    "config-file=s"     => \$auto_install_script_conf,
+    "ip-assignment=s"   => \$ip_assignment_method,
+    "force"             => \my $force,
+    "update-script=s"   => \my $update_script,
+    "post-install=s"    => \$post_install,
+    "listing"           => \$listing,
+    "autodetect-disks"  => \$autodetect_disks
+) || die "$help_info";
+
+
+### BEGIN evaluate options ###
+# if requested, print help information
+if($help) { 
+  print "$help_info";
+  exit 0;
+}
+
+# if requested, print version and copyright information
+if($version) {
+  print "$version_info";
+  exit 0;
+}
+
+# be sure $image is set
+unless ($image) {
+  die "\n$program_name: --image IMAGENAME must be specified.\n$get_help\n\n";
+}
+
+# turns out, it's really handy to use the exact same syntax as getimage
+if($update_script && lc $update_script eq "yes") {
+        $force = 1;
+}
+
+# be sure $image doesn't start with a hyphen
+if ($image =~ /^-/) {
+  die "\n$program_name: Image name can't start with a hyphen.\n$get_help\n\n";
+}
+### END evaluate options ###
+
+# be sure program is run by root
+Rsyphon::Common->check_if_root();
+
+my $imagedir = Rsyphon::Server->get_image_path( $rsync_stub_dir, $image );
+unless ($imagedir) { 
+    print qq(\nFATAL: Image "$image" doesn't appear to exist!\n\n);
+    exit 1;
+}
+
+# If an autoinstallscript was specified, make sure it exists.
+if ($auto_install_script_conf) {
+    unless (-f $auto_install_script_conf) {
+        print "\n$program_name: I can't find\n";
+        die   "$auto_install_script_conf.\n$get_help\n\n";
+    }
+} else {
+    # If an autoinstallscript was not specified, use default for autoinstallscript.conf. -BEF-
+    $auto_install_script_conf = "${imagedir}/etc/rsyphon/autoinstallscript.conf";
+    unless (-f $auto_install_script_conf) {
+        die "ERROR: I can't find the autoinstallscript.conf file. See autoinstallscript.conf(8) for details.\n";
+    }
+}
+
+unless ($script_name) { $script_name = "$image"; }
+
+my $file = "$autoinstall_script_dir/$script_name.master";
+if (( -e "$file" ) && ( ! $force )) {
+    die qq(\nWARNING: "$file" already exists.\n         Use "--force" to overwrite.\n$get_help\n\n);
+}
+
+Rsyphon::Server->validate_ip_assignment_option( $ip_assignment_method );
+Rsyphon::Server->validate_post_install_option( $post_install );
+Rsyphon::Server->validate_auto_install_script_conf( $auto_install_script_conf );
+
+### BEGIN create a fresh master autoinstall script ###
+Rsyphon::Server->create_autoinstall_script(
+	$script_name,
+	$autoinstall_script_dir,
+	$config_dir,
+	$image,
+	$overrides,
+	$imagedir,
+	$ip_assignment_method,
+	$post_install,
+    $listing,
+    $auto_install_script_conf,
+    $autodetect_disks,
+);
+### END create a fresh master autoinstall script ###
+
+$file = "$autoinstall_script_dir/$script_name.master";
+unless ($quiet) { print qq(\nYour new autoinstall script has been created:\n\n); }
+unless ($quiet) { print qq("$file"\n\n); }
+
+exit 0;

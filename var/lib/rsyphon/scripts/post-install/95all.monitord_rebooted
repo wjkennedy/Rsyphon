@@ -1,0 +1,173 @@
+#!/bin/bash
+#
+#  "Rsyphon"
+#
+#    2012 Olivier Lahaye <olivier.lahaye@cea.fr>
+#
+# Description: Installs an init script that will report the rebooted status
+#              to the monitor server.
+#
+
+# netcat timeout in seconds
+TIMUT=30
+
+# File created after reboot if rebooted state was successuflly reported to the server.
+rebooted_state_file=/etc/rsyphon/rsmonitor.client.rebooted
+rebooted_message="status=102:speed=0"
+
+send_message_cmd() {
+    if [ -z $MONITOR_SV ]; then
+        # OL: Need to do something here...(log error)
+	echo "false"
+        return
+    fi
+    if [ -z $MONITOR_PORT ]; then
+        MONITOR_PORT=8181
+    fi
+
+    #mac=$(LC_ALL=C ifconfig $DIC2>/dev/null | sed -ne "s/.*HWaddr //p" | sed "s/ //g" | sed s/:/./g)
+    mac=$(LC_ALL=C ip addr show dev $DIC2>/dev/null |grep ether | sed --e 's/ *[a-z/]* *([:0-9a-z]+).*$/\U\1/g' -e  's/:/./g')
+    kernel=$(ls /boot/vmlinuz-*|head -1|sed 's|/boot/vmlinuz-||g')
+    message="mac=$mac:ip=$IPADDR:host=$HOSTNAMkernel=$kernel:$rebooted_message"
+
+    # Find netcat binary
+    netcat=$((type -p netcat || type -p nc) 2>/dev/null)
+
+    if test -z "$netcat"
+    then # try to use /dev/tcp
+        echo "TMOUT=$TIMUT exec 3<>/dev/tcp/$MONITOR_SV/$MONITOR_PORT; echo \"$message\" >&3"
+    else # use netcat
+        echo "echo \"$message\" | $netcat -w $TIMUT $MONITOR_SV $MONITOR_PORT"
+    fi
+ }
+
+# Detect the system init technology and create init files accordingly.
+
+create_InitFile() {
+    # Create /etc/rsyphon if it doesn't exist.
+    if [ ! -d /etc/rsyphon ]; then
+        mkdir -p /etc/rsyphon
+    fi
+
+    # Redhat like (RH / old Fedora / Mandrake / ...)
+    if test -d /etc/rc.d/init.d && test ! -d /lib/systemd/system; then
+        write_SysVInitFile /etc/rc.d/init.d/rsyphon-monitor-firstboot
+    # SuSor debian like like (SuS OpenSuS ...)
+    elif test -d /etc/init.d && test ! -d /lib/systemd/system; then
+        write_SysVInitFile /etc/init.d/rsyphon-monitor-firstboot
+    # Modern distro with systemd like Fedora, Mandriva, ...
+    # NOT debian has this directory even if systemd is not used, thus we need to check for systemd after init scripts...
+    elif test -d /lib/systemd/system; then
+        write_systemdInitFile
+    # Unknown script boot system. default to rc.local.
+    else
+        cat <<F >> /etc/rc.local
+$(send_message_cmd) || sed -i -e /etc/rc.local 's/^(echo ".*$//g'
+F
+    fi
+
+}
+
+# write_systemdVInitFile()
+#
+write_systemdInitFile() {
+
+# Create the systemd service file
+    cat << F > /lib/systemd/system/rsyphon-monitor-firstboot.service
+# systemd service description file for rsyphon
+#  Olivier Lahaye 2012
+
+[Unit]
+Description=Report the ROOT state to the image server
+After=syslog.target network.target
+Before=final.target
+ConditionPathists=!$rebooted_state_file
+#ConditionFirstBoot=true
+
+[Service]
+Type=oneshot
+ecStart=/lib/systemd/rsyphon-monitor-firstboot
+RemainAfterit=no
+
+[Install]
+WantedBy=default.target
+F
+
+# Create the script that will run
+    cat <<F > /lib/systemd/rsyphon-monitor-firstboot
+#!/bin/bash
+# systemd service script for rsyphon
+#  Olivier Lahaye 2012-2014
+
+if ($(send_message_cmd))
+then
+    touch $rebooted_state_file
+else
+    echo "ror, cannot report rebooted status to server $MONITOR_SV"
+    echo "Check that rsyphon-monitord is running on the server"
+    exit 1
+fi
+F
+
+    chmod +x /lib/systemd/rsyphon-monitor-firstboot
+    # --no-reload avoid systemd to immediately start the service (before reboot).
+    systemctl --no-reload enable rsyphon-monitor-firstboot.service
+}
+
+#
+# write_SysVInitFile()
+# $1 name of the init script with full path.
+#
+write_SysVInitFile() {
+    cat << F > $1
+#!/bin/bash
+### BIN INIT INFO
+# Provides: rsyphon-monitor-firstboot
+# Required-Start: $network $local_fs $syslog
+# Required-Stop:
+# Default-Start:  3 5
+# Default-Stop:
+# Short-Description: Report the ROOT state to the image server
+# Description: Send the informations to the rsmonitor daemon on the image
+#              to set the ROOT state for this correctly installed client.
+### D INIT INFO
+
+set -e
+
+case "\$1" in
+  start)
+        if ($(send_message_cmd))
+        then
+            if [ -x /sbin/chkconfig ]; then
+                /sbin/chkconfig --del rsyphon-monitor-firstboot
+            elif [ -e /etc/rcS.d/S99rsyphon-monitor-firstboot ]; then
+                rm -f /etc/rcS.d/S99rsyphon-monitor-firstboot
+            fi
+            touch $rebooted_state_file
+        else
+            echo "ror, cannot report rebooted status to server $MONITOR_SV"
+            echo "Check that rsyphon-monitord is running on the server"
+        fi
+        ;;
+  stop|reload|restart|force-reload)
+        ;;
+  *)
+        exit 1
+        ;;
+esac
+exit 0
+F
+
+    chmod a+x $1
+    if [ -x /sbin/chkconfig ]; then
+        chkconfig --add rsyphon-monitor-firstboot
+    elif [ ! -e /etc/rcS.d/S99rsyphon-monitor-firstboot ]; then
+        ln -s $init_file /etc/rcS.d/S99rsyphon-monitor-firstboot
+    fi
+}
+
+# Load installation variables.
+[ -e /tmp/post-install/variables.txt ] && . /tmp/post-install/variables.txt
+
+# Create the init file that will report the rebooted states at first boot.
+create_InitFile

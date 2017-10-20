@@ -1,0 +1,259 @@
+#!/usr/bin/perl -w
+
+#
+# "Rsyphon" 
+#
+#  Copyright (C) 1999-2014 Brian Elliott Finley <brian@thefinleys.com>
+#
+
+use strict;
+use Socket;
+
+
+my $dhcpd_lease_file;
+
+# if not run as root, this script will surely fail
+unless($< == 0) { die "Must be run as root!\n"; }
+
+#
+# Oh where oh where could my leases file be?
+#
+my @lease_files_du_jour = ( 
+    "/var/lib/dhcp3/dhcpd.leases",
+    "/var/dhcp/dhcpd.leases",
+    "/var/dhcpd/dhcpd.leases",
+    "/var/state/dhcp/dhcpd.leases",
+    "/var/lib/dhcp/dhcpd.leases",
+    "/var/lib/dhcp/db/dhcpd.leases",
+    "/etc/dhcpd.leases",
+    "/var/lib/dhcpd/dhcpd.leases",
+);
+
+foreach my $file (@lease_files_du_jour) {
+    # does *this* one exist?
+    if ( -e "$file" ) { 
+        $dhcpd_lease_file = $file;
+    }
+    last if ( $dhcpd_lease_file );
+}
+
+if( ! $dhcpd_lease_file ) {
+    print "Can't find your dhcpd.leases file.  Please submit a bug report at\n";
+    print "http://rsyphon.org/support.  Be sure to include your operating\n";
+    print "system name and version, as well as the full path to your dhcpd.leases\n";
+    print "file.  Thanks!\n";
+    exit 1;
+}
+
+my %ip_by_mac = get_ip_by_mac($dhcpd_lease_file);
+my %host_by_ip = get_host_by_ip(%ip_by_mac);
+
+# Oh where oh where could my dhcpd.conf file be?
+my @dhcpd_conf_file_locations_du_jour = ( 
+    "/etc/dhcp3/dhcpd.conf",
+    "/etc/dhcpd.conf"
+);
+
+my $dhcpd_conf;
+foreach my $file (@dhcpd_conf_file_locations_du_jour) {
+    # does *this* one exist?
+    if( -e $file ) { 
+        $dhcpd_conf = $file;
+        last;
+    }
+}
+
+#
+# read in $dhcpd_conf
+#
+open(FILE, "< $dhcpd_conf") or die "Couldn't open $dhcpd_conf for reading: $!\n";
+    my @dhcpdconf = <FILE>;
+close(FILE);
+
+
+#
+# open dhcpd.conf for writing
+#
+my $file = $dhcpd_conf;
+open(FILE, ">> $file") or die "Couldn't open $file for appending: $!\n";
+
+    my $new_entry;
+
+    #
+    # XXX At some point, modify to update existing entries.
+    #
+    foreach my $mac (keys %ip_by_mac) {
+        my $existing;
+        foreach(@dhcpdconf) { 
+            if(/$mac/) { 
+                $existing="yes";
+                last;
+            } 
+        }
+
+        #
+        # Add entries only for new MAC addresses. -BEF-
+        #
+        if( ! $existing ) { 
+            if( $host_by_ip{$ip_by_mac{$mac}} ) {
+                my $hostname = $host_by_ip{$ip_by_mac{$mac}};
+                print "New entry:  $hostname  $mac  $ip_by_mac{$mac}\n";
+                print FILE qq(\nhost $hostname {\n    hardware ethernet $mac;\n    fixed-address $hostname;\n}\n);
+                $new_entry = 1;
+            }
+        }
+    }
+close(FILE);
+
+if( $new_entry ) {
+    print "New entries have been added to your $dhcpd_conf file.\n";
+    print "Be sure to restart your dhcp daemon for the changes to take effect.\n";
+} else {
+    print "No new entries have been made.\n";
+}
+
+exit 0;
+
+
+################################################################################
+#
+# Subroutines 
+#
+sub get_response {
+    my $garbage_out=$_[0];
+    my $garbage_in=<STDIN>;
+    chomp $garbage_in;
+    unless($garbage_in eq "") { $garbage_out = $garbage_in; }
+    return $garbage_out;
+}
+
+
+#
+# Description:
+#
+#   Read in dhcpd.leases and create an IP/mac address hash.
+#  
+#   Example entries:
+#  
+#   # dhcpd v2
+#   lease 192.5.198.116 {
+#     starts 1 2003/02/17 18:18:33;
+#     ends 1 2003/02/17 18:20:33;
+#     hardware ethernet 00:02:b3:ac:7e:31;
+#   }
+#  
+#   # dhcpd v3
+#   lease 192.168.1.22 {
+#     starts 3 2003/05/21 03:23:36;
+#     ends 6 2003/05/24 03:23:36;
+#     tstp 6 2003/05/24 03:23:36;
+#     binding state free;
+#     hardware ethernet 00:0b:cd:50:76:d2;
+#   }
+#
+#
+# Usage:
+#
+#   %ip_by_mac = get_ip_by_mac($dhcpd_lease_file);
+#
+sub get_ip_by_mac {
+
+    
+    my $file = shift;
+    my %ip_by_mac;
+
+    open(FILE, "< $file") or die "Couldn't open $file for reading: $!\n";
+        my @file = <FILE>;
+    close(FILE);
+    
+    while(@file) {
+
+        $_ = shift @file;
+
+        if(/^lease (\d+\.\d+\.\d+\.\d+)/) {
+            my $ip;
+            my $mac;
+
+            $ip = $1;
+            $_ = shift @file;
+
+            until (/^}$/) {
+                if(/hardware ethernet ((([0-9A-Fa-f]){2}:){5}([0-9A-Fa-f]){2})/) {
+                    $mac = $1;
+                }
+                $_ = shift @file;
+            }
+
+            #
+            # A lease may be abandoned, leaving the mac blank, so we make sure it
+            # exists so we don't mangle the hash. -BEF-
+            #
+            if($mac) {
+                $ip_by_mac{$mac} = $ip;
+            }
+        }
+    }
+    return %ip_by_mac;
+}
+
+
+#
+# Description:
+#
+#   Resolve ip addresses to host names and put in a hash.
+#  
+#
+# Usage:
+#
+# my %host_by_ip = get_host_by_ip(%ip_by_mac);
+#
+#
+sub get_host_by_ip {
+    
+    my (%ip_by_mac) = @_;
+    my %host_by_ip;
+
+    #
+    # 1) Resolve IPs to hostnames via DNS
+    #
+    foreach my $mac (sort (keys %ip_by_mac)) { 
+        my $ip = $ip_by_mac{$mac};
+        #
+        # resolve ip to host name
+        #
+        my $host = gethostbyaddr(inet_aton($ip), AF_INET);
+
+        if($host) {
+            $host_by_ip{$ip} = $host;
+        }
+    }
+
+    #
+    # 2) Resolve IPs to hostnames via /etc/hosts (and override any conflicting
+    #    DNS entries).
+    #
+    my $file = "/etc/hosts";
+    open(FILE, "< $file") or die "Couldn't open $file for reading: $!\n";
+        while (<FILE>) {
+            if (/^\s*(\d+\.){3}\d+\s+\w/) {   # match a non-commented IPv4 ip/hostname entry
+                my @fields = split;
+                $host_by_ip{$fields[0]} = $fields[1];
+            }
+        }
+    close(FILE);
+
+    foreach my $mac (sort (keys %ip_by_mac)) {
+        my $ip = $ip_by_mac{$mac};
+        if( ! $host_by_ip{$ip} ) {
+            # issue warning
+            print "WARNING:  $ip failed to resolve to a hostname.  Skipping.\n";
+        }
+    }
+
+    return %host_by_ip;
+}
+
+#
+################################################################################
+
+

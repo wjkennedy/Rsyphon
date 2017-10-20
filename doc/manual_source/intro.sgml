@@ -1,0 +1,417 @@
+<chapter id=Intro>
+  <title>Introduction to Rsyphon<superscript>&#174;</superscript></title>
+  <section>
+    <title>Rsyphon Overview</title>
+    <para>
+	<application>Rsyphon</application>, a component of the
+	<application>System Installation Suite</application>, is software
+	that automates <application>GNU/Linux</application> installs,
+	software distribution, and production deployment.
+    </para>
+    <para>
+	One key feature of Rsyphon is that it is distribution-agnostic and
+	is able to support heterogeneous hardware. This allows the deployment of any
+	kind of GNU/Linux distribution (standard or even customized) to any kind of target
+	machine. The main goal of the project is to make deployment of large numbers of
+	computers easy. Typical environments include computer labs and render farms,
+	but Rsyphon has proven particularly popular in clustered computing environments,
+	such as grid and high performance computing.
+    </para>
+    <para>
+	Another design feature that facilitates GNU/Linux distribution and hardware
+	independence is that <application>Rsyphon</application> works with
+	file based (rather than block based) system images. An image is stored as a
+	directory hierarchy of files representing a comprehensive snapshot of a
+	machine, containing all the files and directories from the root of that
+	machine's file system. Images can be acquired in multiple ways, including
+	retrieval from a sample system (golden client), or by direct generation on the
+	Rsyphon server using third-party tools.
+    </para>
+    <para>
+	The standard method of image creation involves cloning of a
+	pre-installed machine, the golden-client. In this way, the user can customize
+	and tweak the golden-client's configuration according to his needs, verify it's
+	proper operation, and be assured that the image, once deployed, will behave in
+	the same way as the golden-client. Incremental updates are possible by syncing
+	an updated golden-client to the image, then syncing that image to deployed
+	machines using the rsupdateclient command.  Images are hosted in a central
+	repository on a server, called the image-server, and they can be distributed
+	among the clients using different transports: rsync (the default), multicast
+	(via Flamethrower1), SSL encrypted rsync (using a SSH tunnel), and via
+	BitTorrent.
+    </para>
+    
+  </section>
+  
+  <section>
+    <title>Who Should Use This Guide</title>
+    <para>
+      This guide is for system administrators who install and configure
+      systems	in a network environment.  Those who would benefit from using
+      Rsyphon include:
+    </para>
+    <itemizedlist>
+      <listitem>
+	<para>
+	  Organizations with Internet server farms
+	</para>
+      </listitem>
+      <listitem>
+	<para>
+	  Organizations that manage many workstations or servers
+	</para>
+      </listitem>
+      <listitem>
+	<para>
+	  Organizations doing super-computing/clustering with Linux
+	</para>
+      </listitem>
+      <listitem>
+	<para>
+	  Organizations involved in complex Linux-based grid-computing
+	  environments
+	</para>
+      </listitem>
+      <listitem>
+	<para>
+	  Anyone who needs to maintain identical configurations on a large 
+	  number of machines
+	</para>
+      </listitem>
+      <listitem>
+	<para>
+	  Manufacturing organizations that must automate the software preload
+	  process for Linux based machines.
+	</para>
+      </listitem>
+    </itemizedlist>
+  </section>
+  <section>
+    <title>How Rsyphon Works</title>
+    <para>
+      Rsyphon allows you to retrieve an entire system image from a
+      golden client, which is a manually installed, customized machine, to
+      an image server, which is the machine that will hold and distribute
+      system images.  You can deploy the images to any number of client
+      systems from the image server.
+    </para>
+    <para>
+      After initial image deployment, you can update the client systems by
+      syncing them from an updated image on the image server.  Updates are fast
+      and efficient because only the modified parts of files are pulled to
+      the clients.
+    </para>
+    <section>
+      <title>Supported Distributions</title>
+      <para>
+	<application>Rsyphon</application> uses 
+	<ulink url="http://wiki.rsyphon.org/index.php/System_Configurator">SystemConfigurator</ulink>
+	to custom configure autoinstall clients for specific distributions.
+	Through <application>SystemConfigurator</application>,
+	<application>Rsyphon</application> supports all
+	major <application>GNU/Linux</application> distributions and most
+	others, including custom or in-house distributions. Using "footprints",
+	SystemConfigurator works with distributions based on their system
+	configuration style rather than needing to know the name of the
+	distribution. To determine a system's footprint,
+	<application>SystemConfigurator</application> identifies the
+	configuration files in use and associates that footprint with a
+	configuration style. It then correctly manages settings, such as hostname
+	and IP address, without needing to know the name of the distribution.
+      </para>
+      
+      <para>
+	Therefore, <application>Rsyphon</application> is distribution
+	agnostic in nearly all areas. With few exceptions, all distribution
+	specific knowledge exists within the SystemConfigurator tool, which
+	supports a very large range of distributions. If you find a
+	distribution that does not work with
+	<application>Rsyphon</application>, please file a bug report.
+      </para>
+      
+    </section>
+    <section>
+      <title>System Requirements</title>
+      <itemizedlist>
+	<listitem>
+	  <para>
+	    Your image server must have enough disk space to hold the images
+	    to be installed on your client systems (the default directory used
+            to store images is <filename>/var/lib/rsyphon/images</filename>).
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    All clients that will use the same image should have the same
+	    number of hard drive(s). The hard drives may be of different
+	    capacities, and disks may be larger with no problem and smaller
+	    within reason.
+	  </para>
+	  <para>
+	    Advanced users can modify the 
+	    <filename>/etc/rsyphon/autoinstallscript.conf</filename> file
+	    within an image to make adjustments, then run the 
+   	    <command>rsmkautoinstallscript(8)</command> command to install
+	    the same image on clients with varying disk and/or filesystem
+	    configurations.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    For PXE installations, you need a compatible TFTP server
+	    running on the boot server, which is usually the same machine as
+	    the image/DHCP server. Debian provides such servers in the
+	    <application>tftpd-hpa</application> and <application>atftpd</application>
+	    packages, while Red Hat 7.0 and later include such a server in the
+	    <application>tftp-server</application> package. H. Peter Anvin
+	    maintains the <application>tftp-hpa</application> package, which
+	    provides the required functionality.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    In addition to a compatible TFTP server, PXE network-based
+	    installations may also require a PXE daemon to run on your
+	    image server.  This requirement depends on the firmware used on
+	    the clients and the capabilities of your DHCP server.
+	    Usually a running PXE daemon is not necessary if the image server
+	    uses a recent distribution, since all recent versions
+	    of the DHCP daemon include PXE functionality. 
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    We strongly recommend usage of the
+	    <command>rsmkbootserver(8)</command> tool, included in
+	    <application>Rsyphon</application>, to properly set up
+	    a boot server.
+	  </para>
+	</listitem>
+      </itemizedlist>
+    </section>
+  </section>
+  <section>
+    <title>Glossary of Terms</title>
+    <glosslist>
+
+      <glossentry>
+	<glossterm>image</glossterm>
+	<glossdef>
+	  <para>
+	    A live snaphot of a machine containing files and directories from
+	    the root of that machine's filesystem.
+	  </para>
+	  <para>
+	    An image is a chroot-able filesystem, stored in
+	    <filename>/var/lib/rsyphon/images/$NAME</filename>.
+	  </para>
+	  <para>
+	    Examples:
+	    <itemizedlist>
+	    <listitem><para>/var/lib/rsyphon/images/RHEL4/</para></listitem>
+	    <listitem><para>/var/lib/rsyphon/images/Ubuntu_7_04/</para></listitem>
+	    <listitem><para>/var/lib/rsyphon/images/HPC_1.0/</para></listitem>
+	    <listitem><para>...</para></listitem>	    
+	    </itemizedlist>
+	  </para>
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>override</glossterm>
+	<glossdef>
+	  <para>
+	    Overrides can be used to manage differences from images. A typical
+	    use is to customize a "vanilla" image by adding additional
+	    packages, but they are commonly used to store and distribute
+	    configuration files by <command>rspushoverrides(8)</command>.
+	  </para>
+	  <para>
+	    Overrides are stored by default in /var/lib/rsyphon/overrides/
+	    (this directory can be changed in the configuration file
+	    <command>/etc/rsyphon.conf</command>).
+	    All the files and directories defined inside an override are
+	    distributed exactly as-is, which means preserving
+	    <emphasis>all</emphasis> data and metadata: permissions,
+	    ownership, timestamps, etc.
+	  </para>
+	  <para>
+	    Examples:
+	    <itemizedlist>
+	    <listitem><para>/var/lib/rsyphon/overrides/RHEL4/</para></listitem>
+	    <listitem><para>/var/lib/rsyphon/overrides/Compute_config/</para></listitem>
+	    <listitem><para>/var/lib/rsyphon/overrides/HPC_1.0_custom/</para></listitem>
+	    <listitem><para>...</para></listitem>	    
+	    </itemizedlist>
+	  </para>
+
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>image server</glossterm>
+	<glossdef>
+	  <para>
+	    A server that has all the images and overrides available for the
+	    installation.
+	  </para>
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>client</glossterm>
+	<glossdef>
+	  <para>
+	    A machine to be auto-installed with a (single) selected image.
+	  </para>
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>golden client</glossterm>
+	<glossdef>
+	  <para>
+	    A manually-installed, customized machine from which an image is taken for
+	    deployment to client systems.  
+	  </para>
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>transport</glossterm>
+	<glossdef>
+	  <para>
+	    The protocol used to distribute images from the image server to the
+	    clients. Different approaches can be used, depending on the
+	    particular transport used: push / pull / p2p / ...
+	  </para>
+	  <para>
+	    Examples: rsync, multicast, rsync over SSH, BitTorrent
+	  </para>
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>autoinstall media</glossterm>
+	<glossdef>
+	  <para>
+	    Media that is used to boot an autoinstall client to begin the
+	    autoinstall process.  Autoinstall media can be a USB disk, a
+	    CDROM, the network (via PXE), or the local hard drive of the
+	    autoinstall client.
+	  </para>
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>autoinstall script</glossterm>
+	<glossdef>
+	  <para>
+	    One or more scripts associated with an image, each unique
+	    to a specific partitioning/filesystem/network configuration.  
+	    The <command>rsgetimage(8)</command> command creates an initial
+	    autoinstallscript, which can be regenerated later, possibly
+	    with different options, using the 
+	    <command>rsmkautoinstallscript(8)</command> command.
+	    The autoinstall script (also called the ".master script") is 
+	    downloaded and executed by the autoinstall client, and performs
+	    most of the autoinstall process.
+	    Names of autoinstall scripts begin with the image name 
+	    and end in .master.  For example:
+	    <filename>my_webserver_image_v1.master</filename>
+	  </para>
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>rsgetimage(8)</glossterm>
+	<glossdef>
+	  <para>
+	    A command run from the image server to pull a system
+	    image from a golden client.
+	  </para>
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>rsprepareclient(8)</glossterm>
+	<glossdef>
+	  <para>
+	    A command you must run on the golden client immediately 
+	    prior to running <command>rsgetimage(8)</command> on the image server. 
+	    <command>rsprepareclient(8)</command>
+	    prepares the golden client to have its image retrieved and creates
+	    an <filename>etc/rsyphon</filename> directory with information
+	    about the golden client, such as the disk partitioning scheme(s).
+	  </para>
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>rsclusterconfig(8)</glossterm>
+	<glossdef>
+	  <para>
+	    A tool to manage and show the Rsyphon cluster topology.
+	    Using this command, it is possible to tell your image server which
+	    image and overrides to install on the auto-install clients.
+	  </para>
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>rsmkdhcpserver(8)</glossterm>
+	<glossdef>
+	  <para>
+	    A command that creates a <application>Rsyphon</application>
+	    -appropriate <filename>/etc/dhcpd.conf</filename> file.  DHCP can be
+	    used to assign IP addresses to autoinstall clients.
+	  </para>
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>rsmkdhcpstatic(8)</glossterm>
+	<glossdef>
+	  <para>
+	    A command to modify the <filename>/etc/dhcpd.conf</filename> file,
+	    adding static entries for autoinstall clients based on the IP
+	    addresses handed out to these clients by the DHCP server.
+	  </para>
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>rsmkbootserver(8)</glossterm>
+	<glossdef>
+	  <para>
+	    A utility that helps to setup and configure a network boot server for
+	    <application>Rsyphon</application>.
+	  </para>
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>rsupdateclient(8)</glossterm>
+	<glossdef>
+	  <para>
+	    A command that updates or synchronizes client systems to a new or
+	    updated image after the initial autoinstall, enabling software and
+	    content distribution.
+	  </para>
+	</glossdef>
+      </glossentry>
+
+      <glossentry>
+	<glossterm>rspushoverrides(8)</glossterm>
+	<glossdef>
+	  <para>
+	    A command to update and/or keep synchronized clients files, pushing
+	    the overrides defined by <command>rsclusterconfig(8)</command>
+	    from the image server. 
+	  </para>
+	</glossdef>
+      </glossentry>
+      
+    </glosslist>
+  </section>
+</chapter>

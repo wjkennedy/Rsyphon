@@ -1,0 +1,33 @@
+#
+#   $Id:$
+#    vi:filetype=conf:
+#
+#   This is a list of modules to exclude from the UYOK created initrd.img.
+#   These exclusions can be overridden -- see the command you use to create
+#   your UYOK initrd.img for details (Ie: rsprepareclient).
+#   
+#   Exlusions:
+#   - must be listed one entry per line
+#   - must use a relative path, starting from a base path of:
+#       /lib/modules/`uname -r`/
+#   - may be individual files (including module extension)
+#   - may be entire directories, ending with "/*"
+#
+#
+#   Rsyphon standard exclusions go here:
+#
+build/*
+source/*
+kernel/sound/*
+kernel/drivers/video/*
+kernel/drivers/parport/*
+kernel/net/ipv4/netfilter/*
+kernel/net/ipv6/netfilter/*
+kernel/drivers/char/lp.*
+kernel/drivers/char/ppdev.*
+kernel/drivers/input/joystick/*
+kernel/drivers/media/*
+
+#
+#   Locally customized exclusions go here:
+#

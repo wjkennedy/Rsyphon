@@ -1,0 +1,1550 @@
+#
+#   "Rsyphon" 
+#
+#   Copyright (C) 1999-2005 Brian Elliott Finley
+#   Copyright (C) 2007-2008 Andrea Righi
+##  Copyright (C) 2012      Olivier Lahaye
+#
+#   $Id$
+#
+
+4.3.0 [ Not yet released ]
+- Disabled SystemConfigurator in client script (systemconfigurator doesn't support
+  new technologies like systemd, NetworkManager or grub/grub2)
+- fixed rsnetbootmond refusing to start when NET_BOOT_DEFAULT was set to "net".
+- Fixed thread not finished warning when exitting rsmonitortk
+- Add option --include-system-firmware and --firmware-dir to rsprepareclient
+  and rsmkbootpackage.
+- Fix "unable to auto-detect kernel file" in rsprepareclient.
+  (Thanks to David Livingstone for reporting this problem)
+- Updated missing build dependancies (ubuntu 12.10)
+- dhcp: Updated and moved dhclient-script and /etc/dhcp/dhclient-exit-hooks
+- dhcp: Add a patch so configure script can detect linux running kernel >= V3
+- dhcp: reverted to V3.1.3 becasue V4+ have bug that makes dhclient ignore
+  unconfigured interfaces that are down if not specified on the command line
+  Bug tracked and reported upstream as: ICS#32935
+- Enabled all network drivers, firmware, disck controlers, filesystems as modules.
+- Replaced modules-init-tools (obsolete) with kmod-13
+- build: Updated the build system by enforcing dependancies.
+- build use make install instead of make install-exec in order
+  to install devel files in the initrd_build_dir.
+  This permit things like compiling udev using the new kernel
+  headers. Thus, it is possible to have latest udev that can't
+  build on old system like CentOS-6 (kernel headers too old)
+- build: remove useless and devel files before generating the
+  intird.img (/usr/share/* /share/* /lib/*.la /lib/*.a ...)
+- Updated spec file:
+  - Comments
+  - Cleanup
+  - Use of rpm directory for rpm specific patches
+  - Updated BuildRequires: (quilt, ...)
+- Enabled ext4 module in kernel
+- Fix for new parted in Server.pm (avoid grepping "Disk Flags").
+- Added:
+  - Module init tools v3.12 (native modprobe required by udev)
+- Upgraded:
+  - parted to v3.1
+  - dhcpd to v3.1.3
+  - xfsprogs to v3.1.10
+  - util-linux to v2.22.2
+  - mdadm to 3.2.5
+  - kexec-tools to 2.0.3
+  - dhclient to 4.2.4-P2
+  - busybox to 1.20.2
+  - kernel to 3.7.5
+  - LVM to 2.2.02.98
+  - gzip to 1.5
+  - tar to 1.26
+  - zlib to v1.2.5
+- Use make install in LVM instead of manual copy (installs all binaries)
+- Full rewrite of 95all.monitord_rebooted to have correct rebooted status
+  on RHEL like distros. Try to comply with SysVInitScripts and systemd.
+- Fixed mklib.bef so newer already installed libs aren't overwriten
+- Fixed initrd_source/make.d/{udev,coreutils,util-linux}.rul
+  using make install-exec so libtool is used to install binaries
+  and thus avoiding copying the libtool wrapper instead of the
+  real binaries.
+- rpm: Added "BuildRequires: gperf" for udev build to spec file
+- rpm: Added "BuildRequires: device-mapper-devel" to spec file
+- rpm: Added "BuildRequires: quilt" is needed for building sysvinit-2.87dsf
+- rpm: added rpm directory (similar to debian one) to permit non-debian build
+  (includes patches that should only be used on non-debian systems)
+- build: added <package>_build: rule in initrd_source/make.d/*.rul when missing
+- Leave sufficient space before 1st partition so grub2 has enought room there.
+
+4.1.8
+--------------------------------------------------------------------------------
+- added web based monitor GUI for clients.xml
+- added /var/www/rsyphon directory for all SI web pages
+
+4.1.6
+--------------------------------------------------------------------------------
+- use hotplug to automatically load kernel modules in
+  autodetect_hardware_and_load_modules() with BOEL
+- print a list of loaded kernel modules at the end of
+  autodetect_hardware_and_load_modules()
+- remove spinner when quietly installing image: this removes dirty characters
+  in the virtual console of rsmonitortk
+- use a more reliable way to copy module configuration files for UYOK
+- removed 94all.update_initrd post-install script: the same feature is
+  provieded by systemconfigurator adding CONFIGRD = yes in systemconfig.conf
+- fixed a bug in disks/partitions auto-detection routine to initialize LVM
+  devices when --autodetect-disks option is used
+- resolve symlinks when copying module configuration files for UYOK (this fixes
+  disk-by-id naming problems with openSuSE 10.3)
+- added a workaround to not touch /dev/null on a build host with old versions
+  of gcc
+- updated BusyBox to 1.9.1
+- updated rsync to 3.0.0
+- updated mdadm to 2.6.4 (this also fixed a bug with 256K chunk size and RAID5
+  devices)
+- various improvements in rslsimage (completely rewritten to show images
+  details in parallel)
+- fixed a bug with recent kernels and RAID-4/5/6 modules (now all the
+  RAID-4/5/6 functions have been merged in the raid456.ko kernel module)
+- some optimizations in rsclusterconfig
+- now the option --server must be not mandatory for rsprepareclient if
+  --no-rsyncd is specified
+
+4.1.4
+--------------------------------------------------------------------------------
+- turn on rsync quick checks (based on size and modification timestamp) for
+  files in the image and turn off quick checks for files in the overrides
+- allow CTRL+C to break the init script (/etc/init.d/rcS)
+- fix disk names in /boot/grub/device.map if it exists in the image
+- updated BOEL kernel to 2.6.24.2 (for i386 and x86_64)
+- allow rsclusterconfig to show the image associated to each client
+- properly detect UYOK kernel version also when the build string contains the
+  the build date in the yyyy/mm/dd format
+- fix: automaticaly exclude blkid.tab from images
+- allow to auto-detect disks when imaging Xen VMs (experimental)
+- fix: correctly skip non-kernel files in UYOK kernel detection
+- fix: set correct disk names for systemconfigurator
+- any change in autoinstallscript.conf now automatically fixes the boot-loader
+  configuration, so the warning in rsmkautoinstallscript is no more needed,
+  just remove it
+- updated rsync to 3.0.0pre10
+- print image size on the console before starting imaging
+- update the cluster configuration cache only when rsclusterconfig changes
+  something
+- do not clean-up rsmonitortk threads on exit
+- print a note about cluster-register/cluster-map website
+  (http://www.rsyphon.org/cluster-register) when a image is successfully
+  cloned and configured by rsgetimage
+- synchronize /etc/hosts with /var/lib/rsyphon/scripts/hosts (the hosts
+  file used during imaging) by rsclusterconfig only when /etc/hosts changes
+- remove redundant boot parameters in systemconfig.conf
+
+4.1.2
+--------------------------------------------------------------------------------
+- updated BOEL to 2.6.24 (for i386 and x86_64)
+- updated BusyBox to 1.9.0
+- updated LVM to 2.2.02.26 and devmapper to 1.02.22
+- updated e2fsprogs to 1.40.2
+- updated tar to 1.19
+- reimplemented rspushupdate to work over rspsh
+- rsclusterconfig with no option now returns the list of all the clients
+- fixed a bug in autoinstall script to correctly save original versions of
+  /etc/grub.conf, /etc/lilo.conf and /boot/grub/menu.lst
+- fixed a bug that did not allow to install multiple initrd_template deb
+  packages of different architectures
+- fixed a bug in rsnetbootmond that generated a wrong localboot file when
+  deploying over a ssh tunnel
+- now rsclusterconfig executed with no argument returns the whole list of
+  clients
+
+4.0.2
+--------------------------------------------------------------------------------
+- fixed a bug in the rsync transport to correctly set the atime/mtime of
+  symlinks with kernels < 2.6.22
+- fixed a bug to automatically detect a valid initrd also for statically built
+  UYOK kernels (without loadable modules support)
+- fixed a bug to properly run systemconfigurator at the end of the imaging
+  process of the PS3 clients
+- fixed a but in systemconfig.conf creation (BOOTDEV parameter was not
+  correctly used)
+- fixed a bug with kexec fast-reboot to support relocatable kernels from RHEL5
+- fixed a bug in CentOS distribution to correctly detect an initrd for UYOK
+- improvements in initrd detection for UYOK
+- added systemconfigurator >= 2.2.11 dependency
+
+4.0.0
+--------------------------------------------------------------------------------
+- updated the manual including the documentation of all the recent features
+- some fixes to build Rsyphon deb packages for Sony PS3
+- added some missing dependencies to build .deb packages
+- allow to specify size="*" in the LVM logical volumes definitions (in
+  autoinstallscript.conf)
+- now after a successful interactive image retrieval, rsgetimage proposes to
+  execute rsclusterconfig instead of rsaddclients to define the groups of
+  clients and assign images to them
+- fixed a bug to correctly distribute files in the overrides that have the same
+  size and timestamp of the files in the target client, but a different content
+- fixed a bug to properly set the permission bitmask of the override root
+  directory when the umask of the super-user in the image server doesn't use
+  the standard value 0022
+- fixed a bug with 2.4 kernels without udev to properly translate devfs disk
+  names into the standard /dev names for hardware RAID disks that are using a
+  non-standard naming schema (cciss, ida, rd, ...)
+- fixed a bug to automatically skip udev network persistent naming rules in
+  Debian or Debian-like distributions
+- fixed a bug to properly recognize LABELs and UUIDs in swap partitions
+- fixed a bug to not auto-detect a kernel for systemconfigurator when
+  rsprepareclient is executed with the --kernel option
+- permanently added ramdisk_size=80000 to the boot parameters
+
+3.9.6
+--------------------------------------------------------------------------------
+- allow to specify multiple overrides per group
+- support dynamic host groups (a list of clients generated by a result
+  of a command executed on the image server)
+- rsupdateclient rewritten to be host-group compliant
+- use systemconfigurator to re-create the boot-loader configuration at
+  the end of the imaging process (this allows to totally redefine the
+  partitioning schema in autoinstallscript.conf and automatically fix the
+  boot-loader configuration, according to the new partitioning schema)
+- added --imaging option to rspsh (if the installation parameter SSHD=y
+  is used the --imaging allows to execute a command on a set of imaging
+  clients)
+- added the "priority" attribute to host groups (if a client belongs to
+  multiple groups, the group with the higher priority will be used to
+  choose the image for that client; regarding the overrides of the
+  groups they'll be sorted by group priority: in case of file overlaps
+  first hit wins)
+- multiple optimizations in the host group translations
+- removed the deprecated command rsmkautoinstalldiskette
+- always use --my-modules with UYOK in ppc64-ps3 architectures to reduce
+  the size of initrd.img
+- make the detection code for PS3 more generic (support also kernels >
+  2.6.16)
+- fix to correctly get UUIDs in hex format from swap headers (the same
+  format used in /etc/fstab)
+- minor fix to get tmpfs boot options with a initramfs (aka cpio-based)
+  initrd
+- minor fix in the monitoring post-install script to correctly report
+  the REBOOTED state in some versions of Red Hat / Fedora distro
+- minor fix in SuSE to update the installed initrd when the imaged
+  client is equipped with a different hardware respect to the golden
+  client
+- other minor fixes for a better error handling
+- additions in manpages
+
+3.9.4
+--------------------------------------------------------------------------------
+- introduced the concept of host group: groups can be listed or
+  modified by the command rsclusterconfig(8)
+- improved tftpbooting architecture: the default /tftpboot root has been
+  moved to /var/lib/tftpboot (more LSB compliant) and it is a symlink to
+  /usr/share/rsyphon/boot. In this way there is no need to keep in
+  sync kernel and initrd.img in /tftpboot anymore and we can support
+  multiple boot packages (kernel + initrd.img) at the same time
+- a lot of improvements in the monitoring engine: now it is possible
+  keep monitored thousands of imaging clients with a low overhead of the
+  monitoring daemon
+- improved the rsmonitortk GUI responsiveness
+- added a clickable header on top of the clients table in rsmonitortk
+  GUI to sort the monitored clients with a single click
+- added full support to filesystem LABELs and UUIDs
+- added --flavor option to rsmkbootpackage: this allows to directly
+  create a boot package into a new flavor
+- added the --append option to rsmkclientnetboot: this allows to define
+  installation parameters for the target clients by rsmkclientnetboot
+  (without the need to manually edit the syslinux.cfg file)
+- at the end of the imaging systemconfigurator now configures the same
+  interface used to perform the auto-installation and not always eth0
+- now at the end of the auto-installation systemconfigurator will
+  automatically configure the same network device used to perform the
+  installation (and not always and only eth0)
+- more verbosity for systemconfigurator (useful for troubleshooting
+  activities)
+- rsyphon-boot-<arch>-standard deb package has been splitted in
+  rsyphon-boot-<arch>-standard and rsyphon-initrd-template-<arch>
+- added priority classification of the entries in the TODO list
+- a lot of bug fixes
+- a new Rsyphon boot screen ;-)
+
+3.9.2
+--------------------------------------------------------------------------------
+- Added support for the PS3 architecture
+- Improved support and compatibility with Debian (now deb packages can be
+  automatically built from source using the new target "make deb")
+- updated BOEL kernel to 2.6.21 (for i386 and x86_64)
+- fixed a bug that broke rsmkautoinstalldisk
+- free unused RAM of the initramfs (only with cpio initrd.img) after switching
+  to tmpfs
+- updated udev to udev_108-0ubuntu4
+- support old versions of the BitTorrent client (better compatibilty
+  with *Ubuntu)
+- fixed a lib/lib64 bug with ppc64
+- fixed a bug in rsmonitor daemon that didn't start correctly when the
+  directory /var/lock/rsyphon was not present
+- added missing manpages
+- remount the filesystems in read-only before giving-up when the umount
+  fails at the end of the installation
+- create all the swap partitions before the other filesystems in the autoinstall
+  script: this avoids potential OOM conditions that could occur during the
+  filesystem creation
+- removed unused coreutils package from initrd.img
+- removed unmaintained package imagemanip
+- removed deprecated command rsmkbootmedia
+
+3.9.0
+--------------------------------------------------------------------------------
+- added pci-automod autodetection: this allows to detect all the
+  required device drivers supported by the kernel without the need of an
+  external DB (it is fully based on sysfs and modules.pcimap, shipped with
+  kernel modules)
+- added fast-reboot post install action (based on kexec): this allows to
+  execute the imaged kernel without the need of an additional reboot
+  through the BIOS
+- added rspushoverride command (a tool to synchronize overrides from
+  the image server to the clients, defining cluster topologies and host
+  groups)
+- added support for minix UYOK initrd.img
+- updated BOEL kernel to 2.6.20.4 (for i386 and x86_64)
+- added systemconfigurator >= 2.2.9 dependency (required for by kexec
+  stuff)
+
+3.8.2
+--------------------------------------------------------------------------------
+- fixed a bug in the monitoring: REBOOTED state was not properly
+  reported in some minimal image (without the command which)
+- added "--config FILE" option to rsprepareclient and rsmkbootpackage
+  (and removed from rsmkautoinstalldisk: the option must be used in
+  commands that explicitly create an initrd.img from initrd_template) 
+- do not hard-code common patterns of exclusion in rsgetimage (created
+  the configuration file /etc/rsyphon/getimage.exclude)
+- rsgetimage didn't stop correctly the rsync daemon in the golden
+  client, using rsync over ssh for the image retrieval
+- removed unused coreutils package from initrd.img
+
+3.8.1
+--------------------------------------------------------------------------------
+- added the support of cpio initramfs for UYOK
+- added interactive mode in rspsh
+- added --arch option to rsmkbootpackage
+- added support for Intel S5000PAL based mainboard
+- now the installation parameter DEVICE can be used to bind the
+  execution of the DHCP client on a single interface (instead of
+  requesting an IP for all the available interfaces on the client)
+- fixed a potential problem in rsgetimage: now some dangerous patterns
+  are automatically excluded during the image retrieval (i.e. /selinux
+  files, LVM caches and backups, NFS stuff, etc.)
+- fixed a problem in the detection of swap labels in RHEL distributions
+- fixed a potential partition size problem with old versions of parted
+  (< 1.6.23)
+- fixed a bug that occurs when parted prints empty flags (now all the
+  patition flags are correctly retrieved)
+- now rsync is not restarted after rsmvimage, rsrmimage and rscpimage
+  (the restart could break the installation if these command were
+  executed during the imaging)
+- fixed a bug in SLES9 for UYOK (the --my-modules option was not able to
+  correctly detect the filename of the loaded kernel modules)
+- fixed a dependency problem with perl(XML::Simple) and perl(XML::Parser)
+
+3.8.0
+--------------------------------------------------------------------------------
+- added SSH=y|n and SSHD=y|n installation parameters
+- added rspushinstall to perform server-driven installation with SSH
+  transport
+- added status option for all the scripts in /etc/init.d
+- support hostname and IP ranges for rspsh, rspcp, rsmkclientnetboot,
+  rsaddclients
+- added --ssh-key and --authorized-keys options to rsprepareclient and
+  rsmkbootpackage (to add SSH private key and/or SSH authorized_keys directly
+  into the initrd.img)
+- automatically kill rsync daemon on the golden client after the image is
+  correctly retrieved
+- updated LVM and device-mapper packages (now Rsyphon can be
+  compiled on Yellow Dog Linux 5.0 ppc64 on PS3)
+- fixed a bug to properly load kernel modules with dashes or underscores
+  in the name
+- fixed a bug in the LVM1 logical volume discovery
+- fixed some bugs in the use of SSH transport
+- fixed a recursion bug in boot-standard RPM that causes yum to crash
+- fixed a bug when saving the partitioning schema of the golden client
+  (with some old versions of parted the partitioning schema can be
+  uncorrectly saved)
+
+3.7.6
+--------------------------------------------------------------------------------
+- resolved some compiling problems in Debian
+- fixed perl::threads bug for Mandriva
+- built more portable RPMs between different distributions
+- added rspsh (Rsyphon Parallel Shell) and rspcp (Rsyphon
+  Parallel Copy)
+- added rsmkautoinstalldisk, a tool to create autoinstall disks
+  (supports also USB devices)
+- added --no-delete option to rsupdateclient
+- added --unit option to rsprepareclient
+- some fixes in the ssh transport
+- better support for ppc64 architectures
+- additional hardware support
+- updated backend packages (LVM, devmapper, discover, rsync)
+- generic bug fixes
+
+3.7.5
+--------------------------------------------------------------------------------
+- BOEL updated to kernel 2.6.18.1
+- added support of parted 1.7.x syntax
+- correctly support swap over LVM
+- correctly support TLS (Thread Local Storage) libraries
+- reimplemented rsmkbootpackage using UYOK library
+- UYOK supports monolithic kernels (and BOEL)
+- improved the monitoring scalability
+- improvents in the BitTorrent transport
+- reduced the verbosity of the imaging process by default to speed up
+  the installation time
+- some fixes in rsmkbootserver
+
+3.7.4
+--------------------------------------------------------------------------------
+- better compatibility with 2.4 kernels
+- better support with cciss/ida/rd RAID controllers
+- added support for filesystems (and swap partitions) with LABELs
+- better support of software-RAID devices (managed by mdadm), LVM
+  (version 1 and 2) and LVM over software-RAID volumes
+- better support of x86_64 architectures
+- added Infiniband support (experimental)
+- new implementation of the BitTorrent transport
+  - autodetection of the staging directory
+  - lot of tunings to speed-up installations
+- monitoring interface improvements (rsmonitortk)
+  - added new states: 'finalizing', 'beeping', 'shutdown', 'rebooting'
+    and 'REBOOTED'
+  - implemented "full log" feature in virtual console (to see full
+    stdout and stderr)
+  - store the whole installation session in /root/rsmonitor.log of the
+    imaged client
+  - optimized CPU and memory utilization on the image server
+  - lots of graphics improvements
+- UYOK improvements
+  - added --kernel and --modules-dir option to rsprepareclient to choose a
+    custom kernel to perform installations
+  - implemented --image option for rsprepareclient (to prepare a
+    kernel+initrd.image package based on the kernel present in the image)
+  - UYOK initrd optimizations
+- BOEL improvements
+  - moved to kernel 2.6.16.5
+  - moved to udev+hotplug device discovery
+- added support for both /dev managed via udev and static /dev
+- added --autodetect-disks option in rsgetimage and
+  rsmkautoinstallscript
+- added FUSION_SAS support (needed for LSISAS1064 support on the Sun Fire X4100 servers)
+- added support for LSI 53c1030 storage adapter on the IBM e326 server
+- new packages: rsyphon-bittorrent, rsyphon-imagemanip
+- better RPM package dependencies for SUSE Linux and Red Hat/Fedora Linux
+- services (eg. /etc/init.d/rsyphon-server-rsyncd) are disabled by default
+  after RPM installation
+- added SKIP_LOCAL_CFG to the kernel boot parameters for the clients (if
+  set to 'y' the check to find local.cfg will be skipped, saving a lot
+  of time with machines that don't properly support floppy controllers
+- lots of bugfixes
+
+3.6.3
+--------------------------------------------------------------------------------
+- Bug: discover patch was removed that allowed support of ICH7
+       controllers.  
+  Fix: upgrade to discover1
+
+3.6.2
+--------------------------------------------------------------------------------
+- Build system fix: change $(SRC_DIR)/$(DISCOVER_DIR)/lib/.libs to
+  $(DISCOVER_DIR)/lib/.libs in libpath
+
+3.6.1
+--------------------------------------------------------------------------------
+- Broke discover and discover-data into seperate make files
+- Simplified each
+- The impetus was to fix a problem where wildcarded discover data files
+  were a target, but they didn't exist until that target had been
+    processed, resulting in a null target of "".  Fixed.
+- depend on discover and discover data build stamps instead of the
+  discover binary and data files.
+- Was using wrong assignment operator (=: instead of =) for
+  DISCOVER_DATA_FILES.  This meant that DISCOVER_DATA_FILES was being
+  evaluated _once_ at the beginning of the build -- prior to the files
+  being there.  Fixed.
+
+
+3.6.0
+--------------------------------------------------------------------------------
+- make complete_source_tarball target for getting all source, including
+  all versions of kernels (results in ~200M tarball)
+- make source_tarball target now only produces rsyphon source
+- all source URLs point to download.rsyphon.org, and all necessary
+  build source will be maintained there.
+- LVM bug fixes
+- rsmonitor tweaks
+- some refinements to UYOK (UseYourOwnKernel), but still considered beta
+- version revs on many supporting utilities
+
+
+3.5.3
+--------------------------------------------------------------------------------
+- installation monitoring GUI (rsmonitor, rsmonitortk)
+- version revs on many supporting utilities
+
+3.5.2
+--------------------------------------------------------------------------------
+Brian Finley
+- added lib/Rsyphon/UseYourOwnKernel.pm
+
+Josh Aas
+- miscellaneous patches aimed at improving Altix support
+
+Andrea Righi
+- added LVM support
+
+dann frazier
+- merge in fixes from 3.4 branch
+
+3.5.1
+--------------------------------------------------------------------------------
+- added hfsutils to boel
+- 2.6 series kernel capability and 2.6 series kernels for many archs.
+- x86_64 (aka. Opteron) support 
+- added pdisk utility to boel initrd
+- "Official" PPC64 support added by Terra Soft Solutions.
+  http://www.terrasoftsolutions.com/news/2004/2004-11-09.shtml
+  Works with PPC64 series Macs running Linux, and in theory, most other Linux
+  on PPC platforms. (AJ Hawks, David Smith, Owen Stampflee, Kai Staats)
+
+
+3.4.0
+--------------------------------------------------------------------------------
+- use pre-install script to turn on dma for ata thingies.  See
+  "/var/lib/rsyphon/scripts/pre-install/99all.dma_on" (finley)
+- include ssh as part of standard build, standard release (finley)
+- renamed _all_ commands to use the "rs" prefix.  allows for tab 
+  completion with a competent shell, like zsh ;-) (finley)
+- took out sfdisk.rul -- haven't been using sfdisk for quite a while 
+  now (finley)
+- added util-linux.rul, for mkswap that supports >2G on ia32.  Recommended by
+  Viet Hoang. (finley)
+- update x86 kernel to 2.6.9 (John Aas)
+
+Rsyphon-3.3.2 (unstable) UNRELEASED
+--------------------------------------------------------------------------------
+o dann frazier
+  - merge in bug fixes from 3.2 branch
+
+Rsyphon-3.3.1 (unstable) 2004.06.01
+--------------------------------------------------------------------------------
+o brian e finley
+  - new version of udpcast
+  - pre and post-install script tweaking
+  - lsimage: add --verbose option, and show image retrieval date
+  - getimage: record image retrieval time in $image/etc/rsyphon/IMAGE_RETRIEVAL_TIME
+
+Rsyphon-3.3.0 (unstable) 2004.04.14
+--------------------------------------------------------------------------------
+o brian e finley
+  - add post-install script support
+  - add pre-install script support
+
+
+Rsyphon-3.2.1 2004.04.05
+-------------------------------------------------------------------------------
+o dannf
+  - 2.4.25 kernel
+o Brian E. Finley
+  - Server.pm: deal with 'noauto' mount option properly during autoinstall
+o Jerry G. DeLapp/dann frazier
+  - Add some strict checking around the APPEND entry in syslinux.cfg
+  - Remove some unnecessary pieces of the default append line
+
+Rsyphon-3.2.0 2004.03.02
+-------------------------------------------------------------------------------
+o added multicast support via Flamethrower. -BEF-
+o added imagemanip tool. -KC-
+o many other bug fixes and improvements
+o renamed init scripts to /etc/init.d/rsyphon-server-<foo>
+o Fix bug #[ 501646 ] prepareclient shouldn't killall rsyncs.
+o added hardlink/parse files patch for rsync from stevegt (Closes #669565).
+o new versions of many of the boel binaries tools, including:
+  - e2fsprogs
+  - openssh
+  - discover
+  - parted
+  - reiserfsprogs
+  - sfdisk
+  - xfsprogs
+-------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Rsyphon-3.0.1 2003.03.30
+--------------------------------------------------------------------------------
+o updateclient: fixed bug [ 676908 ] GATEWAY not set in /local.cfg
+
+--------------------------------------------------------------------------------
+Rsyphon-3.0.0 2002.12.08
+--------------------------------------------------------------------------------
+o static_dhcp and dynamic_dhcp went away.  Now simply use "dhcp".  See comments
+  in autoinstall script on setting the host name to get the functionality that
+  static_dhcp used to provide. -BEF-
+o FAT support: FAT filesystems are now properly supported on i386 and ia64 (this
+  includes vfat).  TODO #482984. -BEF-
+o jfs support
+o xfs support
+o mvimage: Was failing if source image and destination image had the same
+  name, even if a different location was specified (-directory). 
+  Fixed bug# 548279. -BEF-
+o mvimage: Now use rsync to copy the image over, then after a successful
+  copy, we remove the old image directory.  (only if source image dir and
+  destination image dir are different.)  If they're the same, we just use
+  move(). -BEF-
+o updateclient: Fixed bug number 426654.  We now strip the directory, 
+  specified with -directory,  from the beginning of each path to exclude. -BEF-
+o updateclient: The regex that was being created to exclude non-local 
+  filesystems was parsing as a reference, as opposed to actual values. 
+  Therefore, all filesystems ended up being excluded.  Including "/" (root). ;)
+
+  Now we get a reference to the fstypes array with: 
+  "my $fstypes = $config->fstype();"
+
+  Then use it as an array with: "@$fstypes"
+
+  This fixes bug #548156 -BEF-
+
+o updateclient: Stopped accepting varying length (least unique) options.  As
+  in, -verb to specify -verbose when -version is also an option.  Put
+  Getopt::Long module back in and went back to using this for gathering all
+  command line options.  Fixed Bug #547833 and #546599 -BEF-
+o updateclient -a issues bad karma if dnsdomainname doesn't succeed in
+  returning a domain name.  Simplified resolv.conf parsing code.
+  Fixed Bug #547835 -BEF-
+o updateclient: Go back to doing option validation in the body of updateclient,
+  rather than asking AppConfig to do it.  This allows us to present more
+  helpful output to the user. -BEF-
+o updateclient: Put defaults into client.conf, rather than having them in the
+  program itself. -BEF-
+o updateclient: Only use croak() when something we are expecting to work breaks.
+  For option validation and other expected user messages, do manually to provide
+  more useful output. -BEF-
+o updateclient: After gathering options from the config file, use simple
+  variables throughout the code, rather than the AppConfig variable structure.
+  This makes the code easier to read. -BEF-
+o updateclient: Don't include -listing in the options anynmore, but recommend
+  lsimage at the bottom. -BEF-
+o updateclient: Help now indicates that user should put -directory "DIRECTORY"
+  in quotes. -BEF-
+o prepareclient: Fixed the bit about rsync needing a hostname.  No 
+  longer need to prompt the user to allow us to add an entry, and we 
+  leave the /etc/hosts file the way we found it.  Fixes bug #546600 -BEF-
+o Autoinstall client would fail if a /local.cfg was used, but 
+  GATEWAY was not specified.  Autoinstall now only tries to run the
+  route command if GATEWAY is specified.  Fixed bug #547069. -BEF-
+o The configdir variable was misnamed in the
+  _get_list_of_IDE_and_SCRS_devices subroutine.  Changed to config_dir.
+  This fixes bug #546606. -BEF-
+o Re-Worked the devices_by_label.txt creation code.  Fixed bug #545335
+  "prepareclient errors while processing labels". -BEF-
+o Fixed bug #545328 "prepareclient -q doesn't wait for rsync". -BEF-
+o Improved prepareclient messages. -BEF-
+o Fixed bug #501650 "prepareclient needs better tmp files". -BEF-
+o Fixed a bug in Server.pm where partitions 5 and above were not dealt
+  with properly if using hardware RAID and non explicit partitioning. 
+  This fixes bug #453549 -BEF-
+o /etc/rsyphon/rsyncd.conf is now a product of stub files.
+  packages provide only the stubs that are relevent to them, and then
+  regenerate /etc/rsyphon/rsyncd.conf.
+o added -kernel and -initrd flags to mkautoinstall{cd,diskette},
+  allowing media generation using non-default files.  Closes #498741.
+o added notes on using a DHCP v3 to the manual and the mkdhcpserver
+  manpage.  Closes #502946.
+o updateclient no longer references tftpboot.  Closes #507543.
+o cpimage now has ssh support (thanks Thomas Schenk!)
+o new rsyphon-boot flavors
+--------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------
+Rsyphon-2.1.1 2002.02.05
+-----------------------------------------------------------------------
+o IMAGENAME variable added to local.cfg
+o autoinstall will now use local.cfg variables even if
+  ip address is obtained from dhcp
+o addition of --append option to mkautoinstall* which allows
+  additional kernel parameters to be set during the creations of 
+  install media
+o new /etc/rsyphon/client.conf file which defines parameters
+  on the SI client, including which filesystems to support on
+  updateclient
+o removal of beep executable in favor of 'echo -e "\a"'.  
+-----------------------------------------------------------------------
+
+-----------------------------------------------------------------------
+Rsyphon-2.1.0 2002.01.16
+-----------------------------------------------------------------------
+o first development release
+o new arch - ia64
+o prepareclient now supports devfs
+o updateclient now supports Grub and Elilo through the use 
+   of System Configurator
+o fat and vfat filesystems are now imaged with getimage, though
+    the default Rsyphon kernel for i386 will NOT propperly
+    install vfat partitions
+o bootable partitions on golden-clients are now retained
+o various bug fixes
+o i386 kernel upgraded to 2.2.20
+
+-----------------------------------------------------------------------
+Rsyphon-2.0.1 2001.12.15
+-----------------------------------------------------------------------
+
+installserver
+-------------
+o fixed bugs/typos
+
+initrd.gz
+---------
+o replaced old mke2fs with one that supports journaling
+
+make*
+-----
+o inserted missing stubs for the deprecated make* scripts
+
+manpages
+--------
+o added mkautoinstallscript manpage
+
+-----------------------------------------------------------------------
+Rsyphon-2.0.0 2001.10.16
+-----------------------------------------------------------------------
+
+mkdhcpstatic
+------------
+o updated to work w/ RedHat 7.1, thanks to the PiT
+
+FHS
+---
+o this is the FHS compliancy release (Dann/Brian), so lots of files have
+  been shuffled around.  see the toplevel Makefile for details.
+
+updateclient
+------------
+o added -dry-run patch (Dirk Wetter)
+
+addclients
+----------
+o commandlineized (Austin Gonyou)
+o added padded zero support (Brian)
+
+install
+-------
+o new make-based build system
+
+Client.pm
+---------
+o created it. (Brian)
+
+Common.pm
+---------
+o created it. (Brian)
+
+cpimage
+-------
+o created it. (Brian)
+
+dev_ls-lR
+---------
+o added entries for /dev/rd/c0d[3456789]* (Brian)
+
+getimage
+--------
+o broke certain functions out into the Server.pm and Common.pm libraries 
+  (Brian)
+o added -exclude option (Brian)
+o depricated -server now recommends using cpimage (Brian)
+o removed depricated -master-client option (use -golden-client instead) 
+  (Brian)
+
+initrd
+------
+o Added /dev/sdg* and /dev/sdh* entries. (Brian)
+o We now use a Makefile to create the initrd.  This means that the rcS
+  script and other important files are stored in CVS as text files that
+  can be edited induhvidually. (go Dann!)
+
+lsimage
+-------
+o no longer shows tftpboot as an image (Brian)
+
+makeautoinstallcd, makeautoinstalldiskette, makedhcpserver, makedhcpstatic
+--------------------------------------------------------------------------
+o Renamed make* to mk*.  Left make* for this release, but they only say 
+  "Use the mk* versions". (Brian)
+
+mkautoinstallscript
+-------------------
+o created it. (Brian)
+
+mkbootserver
+------------
+o created it.  This tool will now be used to configure an image server 
+  to allow network booting of clients.  (Dann)
+
+mvimage
+-------
+o created it. (Brian)
+
+rmimage
+-------
+o created it. (Brian)
+
+Server.pm
+---------
+o created it. (Brian)
+
+rsyphon.exclude
+--------------------
+o renamed to updateclient.local.exclude.  Hopefully this will be a
+  less confusing name. (Brian)
+
+rsyphon.conf
+-----------------
+o created it.  This configuration file can take variables to specify
+  many defaults throughout Rsyphon. (Dann)
+
+makeautoinstalldiskette
+-----------------------
+o added -out-file option (Dann)
+
+man pages
+---------
+o created (Dann)
+
+
+-----------------------------------------------------------------------
+Rsyphon-1.5.0 2001.05.08
+-----------------------------------------------------------------------
+
+The whole thing
+---------------
+o Added support for secure operation over SSH.
+
+autoinstall initrd.gz
+---------------------
+o Fix bug [ #419185 ] rcS script matches multiple IPs.
+o don't pull hosts file from imageserver if HOSTNAME is known.
+o Fixed bug #407316.  Autoinstall was only working on eth0, even if 
+  another interface got an IP address.  Thanks to James Oakley for 
+  submitting this bug and a patch.
+
+getimage
+--------
+o We were escaping $image so that IMAGE_LAST_SYNCED_TO was not being 
+  set during autoinstall.  Fixed by un-escaping.
+o Fixed bug where the "Would you like to update the autoinstall script 
+  for this image? ([y]/n): " question would fail if the user actually 
+  typed a "y".  Thanks to John Chabalko <john.chabalko@nbci.com> for 
+  finding this bug.
+o Fixed IP assignment question out of order bug.  Thanks to
+  Cath Burrowes <cath@starbiz.com.au> for this patch.
+o Added section to autoinstall.master scripts to deal with testing
+  for and doing raidstop if necessary -- even if we're not 
+  autoinstalling a raid image.
+o Add " || shellout" to the end of almost everything in <image>.master
+  for better error testing.
+o Added some syntax checking for the -update-script option.  
+o Fixed bug: changed stringwise operators to numeric operators where 
+  appropriate.  This bug caused dynamic partitioning to fail when
+  the golden client had 10 or more partitions.  Thanks to
+  Efstathiadis Efstratios <stratos@bnl.gov> for finding this bug.
+
+lsimage
+-------
+o New with this release!
+
+pushupdate
+----------
+o New with this release!
+
+updateclient
+------------
+o -imageserver is now depricated.  use -server.
+
+makeautoinstallcd
+-----------------
+o Verify that the kernel and initrd.gz actually exist.  Suggested by 
+  Greg Pratt <gpratt@valinux.com>.
+
+makeautoinstalldiskette
+-----------------------
+o Verify that the kernel and initrd.gz actually exist.  Suggested by 
+  Greg Pratt <gpratt@valinux.com>.
+
+
+
+-----------------------------------------------------------------------
+Rsyphon-1.4.1 2001.04.20
+-----------------------------------------------------------------------
+
+addclients
+----------
+o Copy /etc/hosts -> /tftpboot/rsyphon/hosts even if we don't 
+  modify it.
+
+autoinstall initrd.gz
+---------------------
+o don't pull hosts file from imageserver if HOSTNAME is known.
+o Fixed bug #407316.  Autoinstall was only working on eth0, even if 
+  another interface got an IP address.  Thanks to James Oakley for 
+  submitting this bug and a patch.
+
+autoinstall kernel
+------------------
+o added IBM ServeRAID support
+o fixed eepro100 cmd_wait bug in the 2.2.18 kernel: 
+  http://www.scyld.com/pipermail/eepro100/2001-January/001442.html
+
+getimage
+--------
+o We were escaping $image so that IMAGE_LAST_SYNCED_TO was not being
+  set during autoinstall.  Fixed by un-escaping.
+o Fixed bug where the "Would you like to update the autoinstall script
+  for this image? ([y]/n): " question would fail if the user actually
+  typed a "y".  Thanks to John Chabalko <john.chabalko@nbci.com> for
+  finding this bug.
+o Added some syntax checking for the -update-script option.
+o Fixed IP assignment question out of order bug.  Thanks to 
+  Cath Burrowes <cath@starbiz.com.au> for this patch.
+o Added section to autoinstall.master scripts to deal with testing 
+  for and doing raidstop if necessary -- even if we're not 
+  autoinstalling a raid image.
+o Add " || shellout" to the end of almost everything in <image>.master
+  for better error testing.
+o Fixed bug: changed stringwise operators to numeric operators where 
+  appropriate.  This bug caused dynamic partitioning to fail when
+  the golden client had 10 or more partitions.  Thanks to
+  Efstathiadis Efstratios <stratos@bnl.gov> for finding this bug.
+
+makeautoinstallcd
+-----------------
+o Verify that the kernel and initrd.gz actually exist.  Suggested by 
+  Greg Pratt <gpratt@valinux.com>.
+
+makeautoinstalldiskette
+-----------------------
+o Verify that the kernel and initrd.gz actually exist.  Suggested by 
+  Greg Pratt <gpratt@valinux.com>.
+
+
+-----------------------------------------------------------------------
+Rsyphon-1.4.0 2001.03.04
+-----------------------------------------------------------------------
+
+install 
+-------
+o Now uses the "install" program wherever possible
+o Now works with /etc/rc.d/init.d/ or /etc/init.d.
+o The imageserver now runs rsync as a daemon from an init script.  This
+  is configured automatically at install time.
+
+installclient
+-------------
+o Don't overwrite rsyphon.exclude if it already exists.  Thanks to
+  Wesley Smith <wessmith@engr.sgi.com>.
+
+getimage
+--------
+o Improved support for ext3.  However, currently all journals are
+  created at 15MB in size.  They are also the hidden type (good).
+  Hopefully we can detect the existing size in the future.  For now
+  the journal sizes can be set by modifying the <image>.master script.
+o deal with networking properly on debian 2.2 and 2.1 systems
+o now leaves it's mark -> "/etc/rsyphon/IMAGE_LAST_SYNCED_TO"
+o added the "replicant" option to the -ip-assignment option.
+o -help and -version now exit with a status of 0.
+o Added support for LABEL=/partition/label format in /etc/fstab.  This
+  format is used in new (not upgrades) RedHat 7 installations.
+o Improper usage statements no longer include the entire output from 
+  the --help option.  In earlier versions this would often run the 
+  usage correction statement off the screen.  Still provides a reminder
+  to "-help".
+o Now autodetects whether prepareclient left the partition data behind
+  as "-explicit-geometry" or as megabytes.  If using megabytes, 
+  getimage creates the autoinstall script in such a way that client 
+  disks don't have to have the same geometry.  They can even be 
+  significantly different sizes.  They can easily be much larger than 
+  the original master client disks and can even be smaller...  (within 
+  reason -- depends on specific partition scheme)
+o Now uses the --numeric-ids rsync option.
+o Fixed a harmless bug that made nasty output when blank lines were in
+  the golden clients /etc/fstab file.  The fix was to tell getimage to
+  skip blank lines in the /etc/fstab file.  
+
+rsyphon.exclude 
+--------------------
+o added additional exclusions for Debian.  Thanks to Wichert Akkerman
+  for sending these in.
+
+local.cfg
+---------
+o Now uses IMAGESERVER instead of DHCPSIADDR.  Of course, it is 
+  backwards compatible so as not to completely confuse you. ;)
+
+rsyncd.conf
+-----------
+o Change back to using one log file: /var/log/rsyphon
+
+afterburner
+-----------
+o Test for inetd and SIGHUP as is appropriate.
+o Test for xinetd and SIGUSR1 as is appropriate.  Thanks to Dann 
+  Frazier <daniel_frazier@hp.com> for pointing out that xinetd only 
+  does a state dump with a SIGHUP and requres a SIGUSR1 to do a soft 
+  reconfigure.
+o Now works with /etc/rc.d/init.d/ or /etc/init.d.
+
+updateclient
+------------
+o now leaves it's mark -> "/etc/rsyphon/IMAGE_LAST_SYNCED_TO"
+  noting the image the client was last synced to.
+o added the -configure-from DEVICE option.  Only used with -autoinstall.
+  Stores the network configuration for DEVICE in the /local.cfg file so
+  that the same settings will be used during the autoinstall process.
+o -help and -version now exit with a status of 0.
+o Now uses the --numeric-ids rsync option.  Thanks to all who submitted
+  info on this one.  This closes bug #123339.
+
+goldenclient
+------------
+o Changed phraseology from "master client" to "golden client"
+
+installclient
+-------------
+o /etc/rsyphon/ directory is now properly created.  This closes bug
+  #123337.  Thanks to James Oakley <joakley@solutioninc.com>.
+
+prepareclient
+-------------
+o No longer use /etc/mtab to get mounted filesystems.  Now we use mount.
+  Now works properly on systems with /etc/mtab linked to /proc/mounts.
+  Thanks to the folks below for helping debug and test this code:
+  o Austin Gonyou <austin@coremetrics.com>
+  o Chad A. Hughes <chughes@coremetrics.com>
+o removed ext3 stuff.  getimage now does all the ext3 stuff.
+o -help and -version now exit with a status of 0.
+o Offers to add "127.0.0.1 $hostname" to /etc/hosts.
+o Now defaults to using megabytes to store partition information.  Can
+  be told to leave explicit partitioning information for getimage with
+  the -explicit-geometry option.
+o What was I thinking in v1.3.0 with the -no-rsyncd option?!?  Don't try
+  this, folks.  It would record your imageserver's partition information
+  as if it were the client's.
+
+makedhcpstatic
+--------------
+o Automatically send a HUP signal to dhcpd (if running) to make it
+  re-read the freshly modified config file.
+
+makedhcpserver
+--------------
+o Now supports specification of an imageserver that is a different
+  machine from the dhcp server.
+o Added patches from John Goebel <jgoebel@valinux.com> to allow for
+  other non-rsyphon specific advanced options!
+
+autoinstallclient
+-----------------
+o added support for 3c905 
+o added support for 3c59x
+o added support for pcnet32
+o added support for Alteon AceNIC/3Com 3C985/NetGear GA620 Gigabit
+o added support for 3ware Hardware ATA-RAID (EXPERIMENTAL)
+o Smallerized.  More stuff done by BusyBox.
+o Now using hardlinks for BusyBox.  Thanks for this suggestion go 
+  to: Rob Latham <rlatham@plogic.com>.
+o Added mawk.  Funky and easily breakable sed stuff can now be done
+  with mawk.
+o Changed to dhclient.  dhclient allows us to try all interfaces for
+  DHCP.  This will solve some instances where a system would boot the 
+  autoinstall media off the network, but then couldn't get an IP 
+  address for the running OS.  dhclient also allows us to specify the 
+  imageserver as seperate from the dhcp server.
+o Bug fix:  Was using POSIX [[:blank:]] in sed statement to find and 
+  change spaces and tabs to single spaces.  Sed version changed and no 
+  longer behaved properly.  Spaces work fine with the v1.3.0 client but
+  tabs will give you errors.
+o Enforce that the client sleeps 35s before trying to use the network.  
+  Even if using local.cfg.
+
+autoinstall scripts 
+-------------------
+o Added the -L option to sfdisk.  Recommended by Matthew Marlowe 
+  <mmarlowe@jalan.com>.
+o Fixed a bug where autoinstall of clients with reiserfs root partitions
+  fails.  The -notail option must be used, otherwise lilo will complain
+  about a hole in a mapfile and not make the disk bootable.  Thanks to 
+  Matthew Marlowe <mmarlowe@jalan.com> for submitting this bug.
+o Turn on swap space after initializing.  In the past we didn't use the
+  swap space at all.  Go ahead and use it to help out in low memory 
+  situations.
+o Now uses the --numeric-ids rsync option.
+o Fixed the bit where egrep is used to test for mounted filesystems 
+  (indicating a running machine that shouldn't be touched).  grep is now
+  used and no error messages should be seen.
+
+makeautoinstallcd
+-----------------
+o -help and -version now exit with a status of 0.
+
+makeautoinstalldiskette
+-----------------------
+o -help and -version now exit with a status of 0.
+o Test for either superformat or fdformat.  Use superformat if both exist.
+
+
+-----------------------------------------------------------------------
+Rsyphon-1.3.0 2000.10.04
+-----------------------------------------------------------------------
+- autoinstall kernel -- Patched with:
+                        - http://people.redhat.com/mingo/raid-patches/raid-2.2.17-A0
+                        - http://www.tux.org/pub/devel/reiserfs/linux-2.2.17-reiserfs-3.5.25-patch.gz
+- prepareclient -- <<<<< Don't use this feature to update    >>>>>
+                   <<<<< your master scripts.  I must have   >>>>>
+                   <<<<< been up *really* late the night I   >>>>>
+                   <<<<< did this.  See comments for v1.4.0. >>>>>
+                   Added the -n or -no-rsyncd option.  This allows
+                   you to run prepareclient from a chrooted image
+                   and then run getimage with the -s option to
+                   update your master autoinstall script.
+- autoinstall media -- Added support for software RAID.
+- getimage -- Added support for software RAID.
+- getimage -- Fixed a bug where filesystem creation and mounting was 
+              done based on the order of entries in the fstab file.
+              If /boot came before /, for example, then the resultant
+              autoinstall script would unsuccessfully try to mount 
+              /boot first.  Mount points are now sorted.  Thanks to
+              Dale Harris <rodmur@valinux.com> for finding this one.
+- getimage -- Fixed a bug where fstab files containing tabs or with
+              spaces at the beginning of a line might not be parsed
+              properly.  This could potentially result in an 
+              improperly created autoinstall script.
+
+Rsyphon-1.2 2000.09.25
+- makedist -- Only used by me really (Brian).  Now automatically sets the
+              version number in each of the appropriate files.
+- prepareclient -- No longer messes with /etc/rsyncd.conf.  Now uses a
+                   temporary configuration file: /tmp/rsyncd.conf and
+                   references it like this:
+                     rsync --daemon --config=/tmp/rsyncd.conf
+- afterburner -- modified to add [tftpboot] section to existing 
+                 rsyncd.conf file.
+- updateclient -- Now looks for rsyphon.exclude in /etc/rsyphon/.
+- updateclient -- Figures out root device from /etc/fstab and appends
+                  LAST_ROOT=device to lilo.conf entry when -autoinstall is
+                  issued.  This allows for placing a local.cfg file in the 
+                  root filesystem prior to rebooting after running 
+                  updateclient -autoinstall.
+- updateclient -- added the -autoinstall option.  Courtesy of
+                  Alan Lambert <alambert@epicrealm.com>.  Allows you to 
+                  tell any machine that is currently running to autoinstall 
+                  itself the next time you reboot.  *Very* cool idea!  No 
+                  mucking about with removeable media or that tricky PXE 
+                  stuff for remote re-installs.
+- makedhcpstatic -- added support for restarting dhcp daemon.
+- addclients -- images are now presented in chronological order from
+                oldest to newest.  newest is now the default that is 
+                presented.
+- addclients -- made the descriptions more clear and broke it up into 3 
+                sections.
+- rsyncd.conf -- now has entry for /tftpboot and the /var/log/rsyphon
+                 entry is added on a per image basis.
+- autoinstalldiskette -- now uses a 1.44M floppy!
+                         - faster creation
+                         - faster booting
+                         - fewer floppy failures
+- autoinstallclient -- now uses rsync v2.4.6
+- autoinstallclient -- now uses smaller libraries, allowing for larger 
+                       kernels and more utilities!
+- autoinstallclient -- support for use *without* DHCP!  See the FAQ for 
+                       more info.
+- autoinstallclient -- kernel includes support for software RAID and for
+                       reiserfs.
+- autoinstallclient -- added support for post install options of beeping,
+                       shutdown, or reboot.
+- autoinstallclient -- can now be used *without* DHCP.
+- autoinstallclient -- added support for ext3.
+- autoinstallclient -- added support for reiserfs.
+- autoinstallclient -- added beep utility.
+- autoinstallclient -- added mkraid and raidstart utilities.
+- autoinstallclient -- added mkreiserfs.
+- autoinstallclient -- added Wes Smith's patch to sedding for the HOSTNAME.
+- autoinstallclient -- added some diagnostics.
+- autoinstallclient -- added ifconfig and route utilities.
+- autoinstallclient -- using rsync again for everything except network
+                       boot installs.
+- getimage -- you can now specify the path to the image directory with
+              the -directory option.  Suggested by Wesley Smith 
+              <wessmith@engr.sgi.com>.
+- getimage -- added the -server option to allow copying an image from one
+              imageserver to another.  Suggestion and example code
+              contributed by Phil Champon <pchampon@valueweb.net>.
+- getimage -- modified the way getimage deals with filesystems to make it 
+              much easier to add new filesystems to the supported list.
+- getimage -- added support for post install options of beeping,
+              shutdown, or reboot.
+- getimage -- added support for ext3 and reiserfs.
+- getimage -- changed the mke2fs options to the conservative defaults.
+              Hopefully soon we will be able to detect existing settings and 
+              re-create those by partition.
+
+Rsyphon-1.1 2000.05.26
+- updateclient -- Fixed a bug.  root --> / was not becoming the default 
+  if the -directory option was not used and updateclient was exiting 
+  quietly.  Just an if/then/else issue.
+- syslinux RPM -- Bug in the syslinux RPM prevented proper creation of 
+  bootable CD image with makeautoinstallcd.  This is fixed as of 
+  syslinux-1.48-2.i386.rpm.  (Note: this was not a bug in syslinux, just
+  a bug in the packaging)
+- FAQ-HOWTO updates and fixes.
+- makeautoinstallcd -- fixed a bug where the output file was not created
+  properly unless an absolute path was given.  Now works with an absolute
+  path, a relative path, or just a filename (to be placed in the current
+  working directory).
+- prepareclient -- (also part of the va-rsyphon-client RPM)
+  Implemented a delay between killing a running rsync daemon and starting
+  up the fresh one.
+- prepareclient -- now tests for hostname in /etc/hosts for rsync.
+- autoinstallcd.iso -- autoinstallcd ISO image put up on the download 
+  site. (3 Meg)
+- prepareclient -- gave it a real usage statement.  Behavior is 
+  no longer to traipse upon the network with tftp, but to use the 
+  utilities on the client system.  Options are -help, -version, and -quiet
+- va-rsyphon-client RPM -- now you *must* run prepareclient after
+  installing the client RPM.  This is so that you don't unwittingly have
+  an rsync daemon running sharing things you don't want shared.
+- added support for debian.  Let me know how it goes.
+
+Rsyphon-1.0 2000.05.02
+- The name changed ever so slightly ;)
+- Lots of little things -- bug fixes and what not.  Ease of use stuff.
+- added the "makeautoinstallcd" command.  This allows you to create a 
+  bootable 3 Meg iso9660 image that you can burn to a CD.
+- addclients -- If you give it new hostnames for a range of existing 
+  IP addresses, it now replaces the existing hostnames instead of 
+  ignoring them.
+
+Rsyphon-0.24beta 2000.03.09
+- makedhcpstatic -- Modified to try /var/state/dhcp/dhcpd.leases, then
+  /etc/dhcpd.leases, and as a last resort /var/log/messages.
+- autoinstall system -- The autoinstalldiskette is no longer based on
+  Tom's Root Boot.  It is now a miniature distribution of my own.  It
+  boots using syslinux.  This also allows us to use the same kernel and
+  root filesystem for both diskette booting and network booting via
+  pxelinux (part of syslinux).
+- rsyncd.conf -- added "chroot = no".  
+  Brian Luethke <luethke@msr.epm.ornl.gov> pointed out that if a users
+  UID/GID is different on a client (from the imageserver) when doing an 
+  "updateimage", the client ends up with a file owned by a user that 
+  doesn't exist.  By using "chroot = no", rsync is able to translate UIDs
+  to the appropriate user on the client system.  If a user with the same
+  name does not exist on the client, then it still gets a UID that belongs
+  to no user.  Sigh...
+- rsyphon.exclude -- added /etc/sysconfig/network-scripts/ifcfg-*
+- FAQ-HOWTO -- updated the FAQ and combined it and the HOWTO together.
+- INSTALL -- got rid of this document and added it's contents to the README.
+  Cleaning up clutter is always good.
+- install -- allows a -q, -quiet, or --quiet option.
+- install -- you can now run install from any fully qualified or relative path.
+- install -- relocated /rsyphon/images to /var/spool/rsyphon/images.
+  In the future, the installer will present you with a choice for the _real_
+  location.
+- install -- no longer using a tarball within a tarball.
+- install -- added more statements to tell you what it's doing.
+- install -- added some additional error checking.
+- install -- took out the bit that copied /etc/hosts to /rsyphon/etc/.
+- install -- nothing gets installed to /rsyphon.
+- install -- now puts documentation in /usr/doc/rsyphon-$version.
+- install -- now puts binaries in /usr/sbin/.
+- install -- no longer asks if you want to create an autoinstalldiskette.
+  This was confusing and caused people to think they had to create a diskette
+  at that point, or they had missed their chance.
+- rsyncd.conf -- added *.deb, *.rpm, and *.dbf to the don't compress directive.
+- rsyncd.conf -- removed the [etc] and [installstuff] blocks.  These small 
+  files will now be transferred via tftp.  tftp is now necessary anyway in 
+  order to support network booting.
+- rsyncd.conf -- now logs transactions to /var/log/rsyphon.  This can
+  be used to track the progress of clients autoinstalling or updateimage(ing).
+- addclients -- now asks you for the number of the first machine and the
+  number of the last machine (instead of "how many machines").
+- addclients -- now presents you with a list of avaliable images and tests
+  to be sure that specified image exists.  (suggestion courtesy of Stephen
+  Greene <sgreene@valinux.com>.
+- addclients -- changed to create host entries in /etc/hosts only.  No more
+  messing about with the non-intuitive (dual) location of
+  /rsyphon/etc/hosts.
+- getimage -- has been "perlized" by Wesley Smith <wessmith@engr.sgi.com>.
+- getimage and therefore $image.master -- NISDOMAIN is now added to 
+  /etc/sysconfig/network (for both dhcp and static) and NETWORK and 
+  DOMAINNAME are added to static.  
+  (patch sent in by Michael P. McLeod <mmcleod@bcm.tmc.edu>).
+- getimage and therefore $image.master -- HOSTNAME is only added to 
+  /etc/sysconfig/network when using static IP addresses.  This way, the host 
+  gets it's hostname via DHCP along with it's IP address -- and they match!  
+  Even if they change!  This means you can change the hostname by simply 
+  changing the IP address assigned by dhcpd (based on MAC addres).
+- getimage and therefore $image.master -- pointed new images to 
+  /var/spool/rsyphon/images/$image and reflected this in the
+  /etc/rsyncd.conf file.
+
+Rsyphon-0.23 2000.02.14
+- getimage and therefore $image.master -- only $HOSTNAME is written to 
+  /etc/HOSTNAME and /etc/sysconfig/network instead of $HOSTNAME.$DOMAINNAME
+- getimage and therefore $image.master -- fixed a bug where filesystems were
+  not created and mounted in the appropriate order.  (bug submitted by 
+  Tanmoy Bhattacharya <tanmoy@lanl.gov>)
+- getimage and therefore $image.master -- took out the bit at the end that
+  tries to make noise and ends up writing "\a\a\a\a\a\a\a"
+- getimage and therefore $image.master -- Ian McLeod <ian@valinux.com> 
+  observed compression saturating CPU utilization on an imageserver when 
+  installing only 8 clients simultaneously.  Turned compression off during 
+  autoinstall, and observed moderate CPU utilization whilst installing 21 
+  clients simultaneously.  Now I need to go to Gigabit Ethernet on the 
+  imageserver to relieve the network bottleneck.
+- getimage and therefore $image.master -- added an example of how to customize 
+  the sfdisk statements.  If you are installing the same image to clients with
+  disks that are physically different in any way from the client you got the 
+  image from, you should customize your sfdisk statements according to the 
+  example you will find in your $image.master script after you do your getimage.
+
+Rsyphon-0.22 1999.12.29 (I'm getting Altitude sickness -- no more
+                              declaring the elevation.  Well, I'm not really
+                              sick, not that way, anyway, but it's not really 
+                              accurate.  I didn't do all of the work on v0.21
+                              at 655 feet, for example.  Oh, well ;)
+- Ari, sorry I haven't incorporated your changes yet.  Haven't been able to 
+  review them thoroughly and test them.  But they look good and will get in 
+  soon.
+- added 5 more seconds to each of the two sleep statements on the 
+  autoinstalldiskette.
+- fixed a bug in the autoinstalldiskette (found by Susan Coghlan <smc@lanl.gov>
+  and separately found by Robert Saft <zardoz@valinux.com> and 
+  Ted Arden <ted@valinux.com>).  Both new and old mkswap commands were on the
+  diskette, but the new one was in /tmp/ ?  Moved the new (large swap capable)
+  mkswap command to /usr/bin on the diskette and got rid of the old one.
+- fixed a bug in the autoinstalldiskette (found by Susan Coghlan <smc@lanl.gov>)
+  that had to do with finding the nodes host name based on it's IP address.  If
+  the node had an IP address of 1.1.1.24, but 1.1.1.244 came earlier in the 
+  /rsyphon/etc/hosts file, it would match the 1.1.1.244 address and assume
+  it was the corresponding host.
+- do chown afterwards, so that files in tarball don't have to be owned by root
+- autoinstalldiskette -- umount all non-floppy filesystems and make noise when 
+  done, in addition to dropping eth0, but don't halt (so that noise continues)
+
+Rsyphon-0.21 1999.12.07 at 655 feet (Dallas, Tx)
+- install and prepareclient -- bux fix submitted by Susan Coghlan 
+  <smc@acl.lanl.gov>: dots (.) and dashes (-) in function names apparently 
+  break with bash2.  Also recommended a change in the way prepareclient 
+  deals with /etc/rsyphon.exclude.
+- addclient -- changed some of the interactive defaults as indicated by [x],
+  and added some error checking.
+- install -- bug in the verbage -- fixed by Ari Jort.
+- FAQ -- updated by Ari Jort.
+
+Rsyphon-0.20 1999.11.22 at 655 feet (final touches made in Dallas, Tx)
+                                 (but coded at several different altitudes)
+- overall theme for changes -- scripts for everything!!!  You should be
+  ready to autoinstall your first client in (basically) three steps:
+  - run install and answer all it's questions and follow it's instructions
+  - run prepareclient on the "master" client
+  - run getimage on the imageserver
+  Now you should be ready to boot your first autoinstall client off the
+  autoinstalldiskette.
+- updateimage -- Major overhaul.  Now written in perl.  Just try it.
+- makedhcpstatic -- decided to continue using /var/log/messages as
+  the dhcpd.leases file can be found in many different places and
+  for some reason, /var/log/messages is always in the same place ;).
+- renamed /rsyphon/installscripts to /rsyphon/installstuff
+- moved /rsyphon/clientstuff into /rsyphon/installstuff
+- changed all instances where "rsyphon" was used to refer to the
+  image server with "imageserver".  It just makes more literary sense.
+- makedhcpserver -- created it!  This script will ask you appropriate 
+  questions and create a starter dhcpd.conf file for you *and* include 
+  the information necessary for autoinstalldiskette clients to find the 
+  imageserver.
+- prepareclient -- now pulls client scripts, client bin, and etc stuff
+  onto "master" client _before_ getting image.  Places updateimage in 
+  /usr/bin on client.
+- $imagename.master -- cleaned up the static IP section (this will be
+  automated later) and added an ifconfig eth0 down so that the client
+  will no longer respond to pings after it has halted (so you can tell
+  when a headless client is finished autoinstalling).
+- addclients -- created it!  This script will create the symbolic links
+  necessary for your autoinstall clients to autoinstall.
+- autoinstalldiskette -- added the aic7xxx module (an Adaptec SCSI module).
+  This means support for the VA Linux Systems FullOn servers.  I also 
+  discovered that with certain ethernet switches it takes about 30 seconds,
+  after the interface comes alive, before they will transmit data on that
+  port.  It seems that the dhcp request would go out during that time
+  period and that the dhcp client would give up.  The autoinstalldiskette
+  now brings up the ethernet interface with a bogus address of 127.0.0.2
+  which makes the interface live (as far as the switch is concerned).  
+  The autoinstalldiskette then sleeps until after the switch starts 
+  transmitting, and then issues it's dhcp request which is serviced 
+  almost immediately.
+- other stuff what I can't remember...
+
+Rsyphon-0.19 1999.10.14 at 655 feet (Dallas, Tx)
+- autoinstalldiskette -- made it truely generic again.  no longer necessary 
+  to modify the diskette image during install.  this means that the server
+  system no longer requires ram disk capability!  And it makes the install
+  floppy more flexible -- you don't have to modify it if you change the IP
+  address of the server.  This is done by adding the IP address of the 
+  imageserver as the last name server entry in dhcpd.conf.  If it 
+  happens to be running a nameserver, great!  If not, the entry will be 
+  ignored.  The client then takes this last name server entry and assumes 
+  it to be the imageserver.
+- prepareclient -- no longer customized at install time.  this script is
+  also now generic.  it simply asks for the imageserver's ip address when
+  it is run.
+- install -- modified appropriately to deal with the above changes.
+- install -- added some error checking to the yes/no questions.
+- prepareclient -- added some error checking to the yes/no questions.
+- autoinstalldiskette -- added some error checking so that even if certain
+  network related errors occur, the system will not hang and you can still
+  login to the client to see what's up. 
+- VERSION -- started keeping separate versions for the autoinstall diskette
+  and Rsyphon (so's that I don't have to modify the image of the 
+  "generic" diskette just to change the release number.
+- getimage -- take "# pounded out lines" in $image/etc/fstab into 
+  consideration.
+
+Rsyphon-0.18 1999.10.05 at 34,000 feet (Albuquerque, NM to Dallas, TX)
+- getimage -- added lines to the /rsyphon/installscripts/$image.master
+  script that can be uncommented if clients will use static IPs after the
+  install.
+- makedhcpstatic -- created it.  No more mucking about trying to punch in
+  gobs of mac addresses.  Simply populate /rsyphon/etc/hosts with all
+  the relevant client and server IP addresses, specify a dynamic range in
+  your dhcpd.conf file, and image your clients with the autoinstall 
+  diskette in the order you want the IP addresses assigned.  After
+  booting your systems, you can run this script to make the static entries
+  for you!  This script reverse resolves IP addresses to hostnames via the 
+  /etc/hosts file on the server and uses hostnames instead of IP addresses 
+  in the dhcpd.conf file.  This way, you can change a hosts IP address by 
+  simply changing the entry in /etc/hosts on the image server.
+- Perl -- started writing server-side scripts in Perl.  Existing server 
+  side scripts will be converted to Perl in time.  It just got too messy 
+  in Bourne. ;)
+- modified the autoinstall diskette so that:
+  - it only has a 5 second delay during boot
+  - it uses extended VGA and doesn't ask your opinion
+  - it shows it's name as "Rsyphon-autoinstalldiskette-$version"
+
+Rsyphon-0.17 1999.10.05 at 655 feet (Dallas, Tx)
+- getimage -- changed rsync options so that it actually *gets* all
+  of the filesystems now that we're no longer assuming only one
+  filesystem.
+- getimage -- chmod +x prepareclient script after modifying
+- getimage -- no longer bother unmounting before halting in $image.master
+- VERSION -- started including this file
+
+Rsyphon-0.16 1999.10.04 at 655 feet (Dallas, Tx)
+- getimage -- overwrite $image.master every time.   
+- getimage -- create $image.master script with the ability to 
+  partition *each disk* *exactly* like on the master client
+  by pulling data left behind by "prepareclient".
+- prepareclient -- rsync over a static sfdisk and get *exact*
+  partition scheme for *each* disk (as per /proc/partitions).
+  store this information in /etc/partitionschemes/$drivename
+  for retrieval by "getimage" once image is on the imageserver.
+
+Rsyphon-0.15 1999.09.19 at 655 feet (Dallas, Tx)
+- getimage -- use rsync to get mount information via /etc/mtab
+  instead of asking if network filesystems are mounted
+  and exclude all non-ext2 filesystems from the get.  Perhaps
+  we'll become more flexible and pull other appropriate filesystems
+  in the future.
+  (This idea courtesy of "Ari Jort" <ajort@valinux.com>)
+
+Rsyphon-0.14 1999.09.19 at 655 feet (Dallas, Tx)
+- modify getimage to assume only swap and root, and therefore to use 
+  the -x option in rsync to constrain to one filesystem.
+- modify getimage to ask questions and do some discovery
+- modify getimage to create $imagename.master in installscripts
+- get rid of Rsyphon.default.sh
+- add warning about floppy drives to makemeadiskette/install.s
+
+Rsyphon-0.13 1999.09.15 at 33,000 feet (Albuquerque, NM to Dallas, TX)
+- maybe I hadn't finished the install script...  added a kill -HUP for inetd
+- also added a kill -HUP for inetd to prepareclient
+- modified prepareclient to create rsyncd.conf if it didn't exist at all
+
+Rsyphon-0.12 1999.09.15 at 655 feet (Dallas, TX)
+- finished install script -- for installing Rsyphon on the image server
+- install script now prompts you to create your first autoinstall diskette
+- wrote prepareclient -- for preparing a client to have it's image taken
+- renamed /rsyphon/installstuff to /rsyphon/installscripts
+- added installscripts entry to 
+  /rsyphon/serverstuff/etc/rsyncd.conf.starterfile 
+- updated /rsyphon/clientstuff/bin/updateimage to not present 
+  "installscripts" when doing a listing.
+- finished modifications to autoinstall diskette to take advantage of using 
+  rsync to grab the initial install script
+
+Rsyphon-0.11 1999.09.14 at 35,000 feet (Newark, NJ to Dallas, TX)
+- changed mode of initial image install so that no tftp is necessary.
+  now using rsync to get client specific install script.  
+  (Idea courtesy of "Ari Jort" <ajort@valinux.com>)
+- added install script -- for installing Rsyphon on the image server
+
+Rsyphon-0.10 1999.09.12 at 32,000 feet (Dallas, TX to New York, NY)
+- added comments to dhcpd.conf.rsyphon.example file
+- added tftp to /usr/bin with man page in /usr/man
+- tftp is now used to pull down scripts using the more flexible scheme 
+  described below.
+- changed mode of initial image install so that no nfs is involved and also to 
+  allow greater flexibility/manageability geared towards client 
+  customization/different images.  
+  (This idea courtesy of "Bartosz Ilkowski" <barbi@danforthcenter.org>)
+
+Rsyphon-0.9 1999.09.07 at swamp level (Princeton, NJ)
+- changed the name from TheLamp to Rsyphon
+- changed script names/directories/variables, etc. as appropriate
+- expanded the exclude list in the getimage script
+
+TheLamp-0.8
+- who knows?
+
+TheLamp-0.7
+- who knows?
+
+TheLamp-0.6
+- get /etc/resolv.conf from dhcpcd -- no more static configuration on diskette
+- pump is not necessary -- can get what we need from dhcpcd
+- get get DNS domain name from /etc/resolv.conf
+- added sfdisk to /bin with man page in /usr/man
+- removed the static sfdisk from /thelamp/installstuff
+- added rsync to /bin with man page in /usr/man
+- removed the static rsync from /thelamp/installstuff
+- added mkswap with >128Meg support to /bin with man page in /usr/man
+- modified the /thelamp/installstuff/install-a-genie script
+
+TheLamp-0.5
+- who knows?
+
+TheLamp-0.4
+- who knows?
+
+TheLamp-0.3
+- who knows?
+
+TheLamp-0.2
+- who knows?
+
+TheLamp-0.1 -- sea level (St. Louis, MO)
+- New Beginning -- Danforth Plant Sciences Center.  The Aladdin Project.
+  Pterodactyl modified to work with Linux. 
+
+Pterodactyl v0.01
+- Genesis ;)
+  Began the winter of 1998/1999
+  Never really packaged for use by others and not very intuitive.  Originally
+  created to allow 4 sysadmins to administer ~400 Solaris boxes of varying
+  hardware and OS revisions on a nationwide network.
+
+
+# /* vi: set ai et ts=4 tw=72: */

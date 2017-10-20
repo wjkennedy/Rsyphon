@@ -1,0 +1,231 @@
+#!/usr/bin/perl -w
+
+#
+# "Rsyphon" 
+#
+#  Copyright (C) 2002 Bald Guy Software 
+#                     <brian.finley@baldguysoftware.com>
+#
+#  $Id$
+#
+
+# set some variables
+$VERSION="SYSTEMIMAGER_VERSION_STRING";
+my $program_name="rsmkclientnetboot";
+my $get_help = "  Try \"$program_name --help\" for more options.";
+
+# declare modules
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use strict;
+use Socket;
+use File::Copy;
+use File::Path;
+use Net::hostent;
+use Getopt::Long;
+use Rsyphon::Config;
+use Rsyphon::Common;
+use Rsyphon::Server;
+use Rsyphon::Options;
+use Rsyphon::HostRange;
+use Rsyphon::UseYourOwnKernel;
+
+use vars qw($config $VERSION);
+
+### BEGIN parse the config file ###
+
+my $tftp_dir = $config->tftp_dir();
+if (!$tftp_dir) {
+    die "FATAL: parameter TFTP_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+
+my $boot_dir = $config->autoinstall_boot_dir();
+if (!$boot_dir) {
+    die "FATAL: parameter AUTOINSTALL_BOOT_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+
+my $localboot_file = "/etc/rsyphon/pxelinux.cfg/syslinux.cfg.localboot";
+my $netboot_file = "/etc/rsyphon/pxelinux.cfg/syslinux.cfg";
+
+#
+### END parse the config file ###
+
+# set version information
+my $version_info = <<"EOF";
+$program_name (part of Rsyphon) version $VERSION
+
+EOF
+
+$version_info .= Rsyphon::Options->copyright();
+
+# Help stuff
+my $help_info = $version_info . Rsyphon::Options->mkclientnetboot_options_header();
+$help_info = $help_info . Rsyphon::Options->generic_options_help_version();
+$help_info = $help_info . Rsyphon::Options->mkclientnetboot_options_body();
+$help_info = $help_info . Rsyphon::Options->generic_footer();
+
+GetOptions( 
+    "help"              => \my $help,
+    "version"           => \my $version,
+    "verbose"           => \my $verbose,
+    "localboot"         => \my $localboot,
+    "netboot"           => \my $netboot,
+    "clients=s"         => \my $clients,
+    "arch=s"            => \my $arch,
+    "flavor=s"          => \my $flavor,
+    "append=s"          => \my $append,
+) or die qq($help_info);
+
+# if requested, print help information
+if($help) {
+    print qq($help_info);
+    exit 0;
+}
+
+# if requested, print version and copyright information
+if($version) {
+    print qq($version_info);
+    exit 0;
+}
+
+Rsyphon::Common->check_if_root();
+
+unless($clients) {
+    print qq(FATAL: Please specify one or more clients with --clients.\n);
+    print qq($get_help\n);
+    exit 1;
+}
+
+unless( ($localboot) or ($netboot) ) {
+    print qq(FATAL: Please specify --localboot or --netboot.\n);
+    print qq($get_help\n);
+    exit 1;
+}
+
+if ($netboot) {
+    unless ($arch) {
+        $arch = Rsyphon::UseYourOwnKernel::_get_arch();
+    }
+    print "[netboot] using the kernel and initrd.img for architecture: $arch\n";
+    unless ($flavor) {
+        $flavor = 'standard';
+    }
+    print "[netboot] using the flavor: $flavor\n";
+
+    # Check if the boot package exists.
+    if (! -d "$boot_dir/$arch/$flavor") {
+        die "ERROR: boot package for architecture \"$arch\", flavor \"$flavor\" doesn't exist!\n";
+    }
+} elsif (($localboot) and (($arch) or ($flavor))) {
+    print "WARNING: ignoring options --arch and --flavor with localboot\n";
+}
+
+# Make array from --clients "hostnames and ip addresses" -BEF-
+my @array = Rsyphon::HostRange::expand_groups($clients);
+
+my $source_file;
+if($localboot) {
+    $source_file = $localboot_file;
+} elsif($netboot) {
+    $source_file = $netboot_file;
+}
+
+open(IN, '<', $source_file) or
+    die "ERROR: couldn't open $source_file for reading!\n";
+my @bootcfg = <IN>;
+close(IN);
+
+if ($netboot) {
+    # Replace kernel and initrd.img using the boot package specified by command
+    # line (and append the kernel command line string if specified).
+    for (my $i = 0; $i <= $#bootcfg; $i++) {
+        if ($bootcfg[$i] =~ s/^\s*KERNEL\s+.*$/KERNEL \/$arch\/$flavor\/kernel/) {
+            next;
+        }
+        $bootcfg[$i] =~ s/\s+initrd=initrd.img\s+/ initrd=\/$arch\/$flavor\/initrd.img /;
+        if ($append) {
+            if ($bootcfg[$i] =~ /^\s*APPEND\s+([^#\n]*)(.*)$/) {
+                $bootcfg[$i] = 'APPEND ' . ($1 or '') . " $append " . ($2 or '') . "\n";
+            }
+        }
+    }
+}
+
+foreach my $client (@array) {
+    # IP or Hostname?
+    if (Rsyphon::HostRange::valid_ip_quad($client)) {
+        my $ip = $client;
+        create_boot_file($ip, @bootcfg);
+    } else {
+        my @ips = get_ips($client);
+        foreach my $ip (@ips) {
+            create_boot_file($ip, @bootcfg);
+        }
+    }
+}
+
+
+################################################################################
+#
+#   Subroutines
+#
+################################################################################
+
+
+################################################################################
+#
+# Description:
+# Creates a boot file for a node.
+#
+# Usage:
+# create_boot_file($ip_dec, @boot_config);
+sub create_boot_file {
+
+    my $ip_dec = shift;
+    my @boot_config = @_;
+    my $ip_hex;
+
+    $ip_hex = Rsyphon::HostRange::ip2hex($ip_dec);
+
+    my $file = $tftp_dir . "/pxelinux.cfg/" . $ip_hex;
+    if ($verbose) { print "Creating $file\n"; }
+
+    # copy file over
+    if (-d $tftp_dir . "/pxelinux.cfg/") {
+        #copy("$source_file", "$file") or die "ERROR: copy failed: $!\n";
+        open(OUT, '>', $file) or
+            die "ERROR: couldn't write to $file!\n";
+        print OUT @boot_config;
+        close(OUT);
+    } else {
+        die "ERROR: $tftp_dir/pxelinux.cfg/ doesn't exist (try to run rsmkbooserver before)!\n";
+    }
+
+    return 1;
+}
+
+
+################################################################################
+#
+# Description:
+# Produce a list of IP addresses from a host name.
+#
+# Usage:
+# my @ips = get_ips($hostname);
+sub get_ips {
+
+    my $host = $_[0];
+
+    my ($hinfo, @ips);
+    if ( $hinfo = gethost($host) ) { 
+        foreach my $addr ( @{$hinfo->addr_list} ) {
+            push @ips, inet_ntoa($addr);
+        }
+    } else {
+        print STDERR "WARNING: can't find an IP address for $host! (skipping)\n";
+    }
+
+    return @ips;
+
+}
+
+

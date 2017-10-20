@@ -1,0 +1,236 @@
+#!/usr/bin/perl -w
+#
+#  "Rsyphon"
+#
+#  Copyright (C) 2005 Andrea Righi <a.righi@cineca.it>
+
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use strict;
+use Getopt::Long;
+use Rsyphon::HostRange;
+
+my $VERSION = "SYSTEMIMAGER_VERSION_STRING";
+
+my $program_name = "rspsh";
+
+my $version_info = << "EOF";
+$program_name (part of Rsyphon) v$VERSION
+
+Copyright (C) 2006 Andrea Righi <a.righi\@cineca.it>
+
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOF
+
+my $help_info = $version_info . <<"EOF";
+
+Usage: $program_name --hosts host_range [OPTION]... COMMAND
+
+Options: (options can be presented in any order and can be abbreviated)
+ --help, -h             Display this output.
+
+ --version, -v          Display version and copyright information.
+
+ --max, -m=NUM          Set the maximum number of concurrent sessions
+                        to NUM (default=32).
+
+ --hosts, -n=HOST_LIST  List of target nodes. List can be separated by
+                        comma, spaces or new line and can include
+                        ranges or host groups
+                        (e.g. "node001-node256 node300,Login,Storage").
+                        Host groups must be defined by rsclusterconfig(8).
+
+ --hosts-file, -f=FILE  File that contains the list of the target host.
+                        Every line can include one or more ranges or
+                        host groups
+                        (e.g. "node001-node256 node300,Login,Storage").
+                        Host groups must be defined by rsclusterconfig(8).
+
+ --timeout, -t=NUM      Set the timeout of the ssh sessions (default=15s).
+
+ --ssh-user, -l=USER    Run the command as user USER.
+
+ --imaging, -i          Run the command on imaging clients (that have a ssh
+			deamon enabled - add SSHD=y in the installation boot
+                        parameters and include a valid authorized_keys into
+			the initrd.img). See rsmkbootpackage(8) or
+                        rsprepareclient(8) for more details.
+
+EOF
+
+Getopt::Long::Configure("posix_default");
+Getopt::Long::Configure("no_gnu_compat");
+Getopt::Long::Configure("bundling");
+
+GetOptions(
+	"help|h"		=> \my $help,
+	"version|v"		=> \my $version,
+	"max|m=i"		=> \my $concurrents,
+	"hosts|n=s"		=> \my $hostlist,
+	"hosts-file|f=s"	=> \my $hostlist_file,
+	"timeout|t=i"		=> \my $timeout,
+	"ssh-user|l=s"		=> \my $ssh_user,
+	"imaging|i"		=> \my $imaging,
+) or die("$help_info");
+
+### BEGIN evaluate commad line options ###
+
+if ($help) {
+	print "$help_info";
+	exit(0);
+}
+
+if ($version) {
+	print "$version_info";
+	exit(0);
+}
+
+my $cmd;
+if (@ARGV) {
+	$cmd = join(' ', @ARGV)
+}
+
+# Evaluate target hosts.
+my @hosts = ();
+if ($hostlist_file) {
+	# Read input file.
+	open(IN, '<', $hostlist_file) ||
+		die("error: could't read $hostlist_file!\n");
+	$hostlist .= ' ' . join(' ', <IN>);
+	close(IN);
+}
+if ($hostlist) {
+	# Expand host groups and host ranges.
+	@hosts = Rsyphon::HostRange::expand_groups($hostlist);
+}
+unless (@hosts) {
+	die("error: no host defined!\nTry \"--help\" for more options.\n");
+}
+
+unless ($timeout) {
+	$timeout = 15;
+}
+
+unless ($ssh_user) {
+	$ssh_user = $ENV{'USER'};
+}
+
+if ($concurrents) {
+	$Rsyphon::HostRange::concurrents = $concurrents;
+}
+
+# Use the following ssh options.
+my $ssh_opts = "-x -o BatchMode=yes -o ConnectTimeout=$timeout -l $ssh_user";
+if ($imaging) {
+	$ssh_opts .= ' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null';
+}
+
+### END evaluate command line options ###
+
+if ($cmd) {
+	$cmd =~ s/"/\\"/g;
+	$cmd = "\"$cmd\"";
+	Rsyphon::HostRange::thread_pool_spawn('ssh', $ssh_opts, $cmd, @hosts);
+} else {
+	# Run in interactive mode.
+	while (-t STDIN) {
+		select(STDOUT);
+		print "rspsh> ";
+		$_ = <STDIN>;
+		unless (defined($_)) {
+			print "\n";
+			last;
+		}
+		if ((/^\s*$/) || (/^\s*exit\s*$/)) {
+			last;
+		}
+		$_ =~ s/"/\\"/g;
+		$_ = "\"$_\"";
+		Rsyphon::HostRange::thread_pool_spawn('ssh', $ssh_opts, $_, @hosts);
+	}
+}
+
+__END__
+
+=head1 NAME
+
+rspsh - Rsyphon Parallel Shell
+
+=head1 SYNOPSIS
+
+rspsh --hosts host_range [OPTION]... COMMAND
+
+=head1 DESCRIPTION
+
+B<rspsh> is a parallel shell to concurrently execute commands on
+multiple nodes.
+
+=head1 OPTIONS
+
+=over 8
+ 
+=item B<--help | -h>
+
+Display a short help.
+
+=item B<--version | -V>
+
+Display version and copyright information.
+
+=item B<--max | -m NUM>
+
+Set the maximum number of concurrent sessions to NUM (default=32).
+
+=item B<--hosts | -n HOST_LIST>
+
+List of target nodes. List can be separated by comma, spaces or new line and can
+include ranges or host groups (e.g. "node001-node256 node300,Login,Storage").
+Host groups must be defined by rsclusterconfig(8).
+
+=item B<--hosts-file | -f FILE>
+
+File that contains the list of the target hosts. Every line can include one or
+more ranges or host groups (e.g. "node001-node256 node300,Login,Storage").
+Host groups must be defined in rsclusterconfig(8).
+
+=item B<--timeout | -t NUM>
+
+Set the timeout of the ssh sessions (default=15s).
+
+=item B<--ssh-user | -l USER>
+
+Run the command as user USER.
+
+=item B<--imaging | -i>
+
+Run the command on imaging clients (that have a ssh deamon enabled - add SSHD=y
+in the installation boot parameters and include a valid authorized_keys into
+the initrd.img). See rsmkbootpackage(8) or rsprepareclient(8) for more
+details.
+
+=back
+
+=head1 SEE ALSO
+
+rsyphon(8), rspcp(8), rspushinstall(8), rsclusterconfig(8) 
+
+=head1 AUTHOR
+
+Andrea Righi <a.righi@cineca.it>.
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2003 by Andrea Righi <a.righi@cineca.it>.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut
+

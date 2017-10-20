@@ -1,0 +1,408 @@
+#!/usr/bin/perl -w
+#
+# "Rsyphon"
+#
+#  $Id$
+#   vi:set filetype=perl:
+#  
+#   Copyright (C) 1999-2006 Brian Elliott Finley <brian@thefinleys.com>
+#   Copyright (C) 2002 Bald Guy Software <brian@thefinleys.com>
+#   Copyright (C) 2001 Sean Dague <sean@dague.net>
+# 
+#   Based on the original mkautoinstallcd by Brian Elliott Finley 
+#   <brian@thefinleys.com>, new version by Sean Dague <sean@dague.net>.
+# 
+#   This program is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; either version 2 of the License, or
+#   (at your option) any later version.
+# 
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+# 
+#   You should have received a copy of the GNU General Public License
+#   along with this program; if not, write to the Free Software
+#   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+
+use lib "USR_PREFIX/lib/rsyphon/perl";
+
+#use strict;
+use Cwd;
+use Carp;
+use AppConfig;
+use File::Path;
+use Getopt::Long;
+use File::Basename;
+use POSIX qw(uname);
+use Rsyphon::Common;
+use Rsyphon::Server;
+use Rsyphon::Config;
+use vars qw($config $VERSION $quiet);
+
+$SIG{__DIE__} = \&bailing_umount;
+
+$VERSION = "SYSTEMIMAGER_VERSION_STRING";
+
+# set path for system calls
+$ENV{PATH} = "/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin";
+
+my $autoinstall_boot_dir = $config->autoinstall_boot_dir;
+unless ($autoinstall_boot_dir) {
+    die "FATAL: parameter AUTOINSTALL_BOOT_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+
+my ($kernel, $initrd, $flavor, $arch, $append_string, $bin_dir);
+
+GetOptions( 
+    "help"          => \$help,
+    "version"       => \$version,
+    "arch=s"        => \$arch,
+    "out-file=s"    => \$out_file,
+    "quiet"         => \$quiet,
+    "append=s"      => \$append_string,
+    "kernel=s"      => \$kernel,
+    "initrd=s"      => \$initrd,
+    "flavor=s"      => \$flavor,
+) or usage() and exit(1);
+
+if($help) { usage() and exit(0); }
+
+if($version) { version() and exit(0); }
+
+# if not run as root, this script will surely fail
+unless($< == 0) { 
+    print "FATAL: Must be run as root!\n";
+    exit 1;
+}
+
+# If -kernel specified, $kernel must exist. -BEF-
+if (($kernel) and (! -f $kernel)) {
+    message("\nI'm terribly sorry, but kernel \"$kernel\" doesn't seem to exist.\n");
+    exit 1;
+}
+
+# If -initrd specified, $initrd must exist. -BEF-
+if (($initrd) and (! -f $initrd)) {
+    message("\nI'm terribly sorry, but initrd \"$initrd\" doesn't seem to exist.\n");
+    exit 1;
+}
+
+# If -arch was not specified on the command line, get it from the system. -BEF-
+unless ($arch) {
+    $arch = (uname())[4];
+    $arch =~ s/i.86/i386/;
+}
+
+# Do we have a supported architecture? -BEF-
+if($arch !~ /^(i386|x86_64|ia64)$/) {
+    message("\nI'm terribly sorry, but I don't yet know how to make an\nauto-install CD for the \"$arch\" architecture.\n");
+    exit 1;
+}
+
+if(!$out_file) {
+    message("Output file not specified!");
+    usage() unless $quiet;
+    exit(1);
+}
+
+unless ($kernel and $initrd) {
+    my %available_flavors =
+	Rsyphon::Common->get_boot_flavors($arch, $autoinstall_boot_dir);
+
+    unless (%available_flavors) {
+	print qq(\nI couldn't find any boot flavors for Rsyphon on $arch.\n);
+        print qq(Please install the appropriate boot files.\n\n);
+        exit 1;
+    }
+
+    if (($quiet) and (!$flavor)) { $flavor = "standard"; }
+
+    unless ($flavor) {
+	print "Here is a list of available flavors:\n\n";
+	foreach (sort (keys %available_flavors)) {
+	    print "  $_\n";
+	    $flavor = $_;
+	}
+
+        # If "standard" is one of the available flavours, default to it. -BEF-
+        if ($available_flavors{"standard"}) { $flavor = "standard"; }
+	
+	print "\nWhich flavor would you like to use? [$flavor]: ";
+	$flavor = get_response($flavor);
+    }
+    
+    
+    # make sure the specified flavor is available
+    unless ($available_flavors{$flavor}) {
+      print "\nI can't find boot files of the flavor and architecture specified.\n";
+      print "The files you specified would come from a Rsyphon boot tarball named:\n\n";
+      print qq( "rsyphon-boot-${arch}-${flavor}-${VERSION}.tar.bz2"\n\n); 
+      exit 1;
+    }
+
+    $bin_dir = "$autoinstall_boot_dir/$arch/$flavor";
+
+    if (! $kernel) { $kernel = "$bin_dir/kernel"; }
+    if (! $initrd) { $initrd = "$bin_dir/initrd.img"; }
+}
+
+if(!-e "$kernel") {
+    message("$kernel does not exist.");
+    exit(1);
+}
+
+if(!-e "$initrd") {
+    message("$initrd does not exist.");
+    exit(1);
+}
+
+# check for mkisofs or genisoimage
+$mkisocmd = '';
+if(which('genisoimage')) {
+    $mkisocmd = 'genisoimage';
+}
+elsif(which('mkisofs')) {
+    $mkisocmd = 'mkisofs';
+}
+else {
+    message("Neither 'mkisofs' or 'genisoimage' could  be found in your path.");
+    exit(1);
+}
+
+# set some variables
+my $temp_dir = "/tmp/rsyphon.autoinstallcd.temp.dir";
+my $temp_file = "$temp_dir/boot/siboot.img";
+my $mnt_dir = "$temp_dir/mnt";
+my $boot_dir = "$temp_dir/boot";
+my $isolinux_dir = "$temp_dir/isolinux";
+
+# if $out_file is not an absolute path, get current working directory and pre-pend
+if($out_file !~ /^\//) {
+    $out_file = getcwd() . "/$out_file";
+}
+
+# create temporary working directory
+unless ($quiet) { print "\nCreating temporary working directory...\n"; }
+if(-e $temp_dir) {
+    bailing_umount(); # just in case it was still mounted
+    rmtree("$temp_dir") or croak("Couldn't remove $temp_dir");
+}
+
+mkdir $temp_dir, 0770 or croak("Couldn't create temporary working directory $temp_dir!");
+mkdir $isolinux_dir, 0770 or croak("Couldn't create temporary working directory $temp_dir/isolinux!");
+
+if ($arch eq "ia64") {
+    mkdir $mnt_dir, 0770 or croak("Couldn't create temporary working directory $mnt_dir!");
+    mkdir $boot_dir, 0770 or croak("Couldn't create temporary working directory $boot_dir!");
+    # This does the dd, and is put in another seperate function because it is arch specific
+    build_loopfile($temp_file) or croak("Couldn't dd the loopfile");
+
+    # create dos filesystem on temporary image
+    mysystem("mkdosfs $temp_file","Creating DOS filesystem on temporary image...") or
+      croak("Couldn't create DOS filesystem on $temp_file!");
+}
+
+my $local_cfg = "";  # local.cfg currently not supported on CD. -BEF-
+
+# If on i386 or x86_64, use isolinux for booting.
+if(($arch eq "i386") || ($arch eq "x86_64")) {
+    # locate isolinux.bin
+    my @isopath=("/usr/lib/syslinux", "/usr/share/syslinux");
+    my $isolinux;
+    for my $p (@isopath) {
+	if (-f "$p/isolinux.bin") {
+	    $isolinux = "$p/isolinux.bin";
+	    last;
+        }
+    }
+    croak("Couldn't find isolinux.bin in ".join(" ",@isopath)." !") if (!$isolinux);
+    mysystem("cp $isolinux $isolinux_dir");
+    Rsyphon::Server->copy_boot_files_to_boot_media($kernel, $initrd, $local_cfg, $arch, $isolinux_dir, $append_string);
+    if ($arch eq "x86_64") {
+	mysystem("sed -e 's/initrd.img root=/initrd.img noexec=off root=/' $isolinux_dir/syslinux.cfg > $isolinux_dir/isolinux.cfg");
+    } else {
+	mysystem("cp $isolinux_dir/syslinux.cfg $isolinux_dir/isolinux.cfg");
+    }
+
+} else {      # ia64
+
+    # mount the loop device
+    mount_loop_device($temp_file, $mnt_dir,"Mounting temporary image in loopback mode...");
+    # copy stuff to image
+    Rsyphon::Server->copy_boot_files_to_boot_media($kernel, $initrd, $local_cfg, $arch, $mnt_dir, $append_string)
+      or croak("Couldn't copy required files into the image!");
+
+    # Umount the loopback device
+    mysystem("umount $mnt_dir","Un-mounting temporary image...") or
+      croak("Couldn't un-mount temporary from $mnt_dir/tmp!");
+    # and clean it up
+    rmtree("$mnt_dir") or croak("Couldn't clean up $mnt_dir");
+}
+
+my $olddir = getcwd();
+chdir("$temp_dir");
+
+$mkisocmd  = "$mkisocmd -J -r -T -v -pad";
+$mkisocmd .= " -A \"Rsyphon $arch Autoinstallcd v$VERSION\"";
+$mkisocmd .= " -V \"Rsyphon $arch Boot CD\"";
+$mkisocmd .= " -p \"Created by rsmkautoinstallcd -- part of Rsyphon.  http://rsyphon.org/\"";
+if (($arch eq "i386") || ($arch eq "x86_64")) {
+    $mkisocmd .= " -b isolinux/isolinux.bin -c isolinux/boot.catalog";
+} else {
+    $mkisocmd .= " -b boot/siboot.img -c boot/boot.catalog";
+}
+$mkisocmd .= " -no-emul-boot -boot-load-size 4 -boot-info-table";
+$mkisocmd .= " -o $out_file .";
+
+mysystem($mkisocmd,"Making the ISO image now") or
+  croak("Couldn't build the ISO image!");
+chdir($olddir);
+
+print "Removing temporary directory point...\n" unless $quiet;
+rmtree("$temp_dir") or croak("Couldn't remove temporary working directory '$temp_dir'!");
+
+unless($quiet) {
+    print <<EOF;
+Done!
+
+You can now burn your ISO image to a CDROM and boot your auto-install 
+clients from it!
+
+EOF
+}
+
+# build_loopfile builds the right size file to mount as loop for each architecture
+sub build_loopfile {
+    my $outfile = shift;
+    if(($arch eq "i386") || ($arch eq "x86_64")) {
+        return mysystem("dd if=/dev/zero of=$outfile bs=1k count=2880");
+    } elsif ($arch eq "ia64") {
+        return mysystem("dd if=/dev/zero of=$outfile bs=1024k count=10");
+    }
+    return 0;
+}
+
+#
+
+sub mount_loop_device {
+    my ($temp_file, $mnt_dir, $msg) = @_;
+    if(($arch eq "i386") || ($arch eq "x86_64")) {
+        mysystem("mount -t msdos -o loop $temp_file $mnt_dir",$msg) or
+          croak("Couldn't mount temporary image in loopback mode!");
+    } elsif ($arch eq "ia64") {
+        mysystem("mount -t vfat -o loop $temp_file $mnt_dir",$msg) or
+          croak("Couldn't mount temporary image in loopback mode!");
+    }
+}
+
+sub get_response {
+    my $garbage_out=$_[0];
+    my $garbage_in=<STDIN>;
+    chomp $garbage_in;
+    unless($garbage_in eq "") { $garbage_out = $garbage_in; }
+    return $garbage_out;
+}
+
+# bailing_umount is here to be set to SIG{__DIE__} so we don't leave mounts all
+# over the place.
+
+sub bailing_umount {
+    system("umount /tmp/rsyphon.autoinstallcd.temp.dir/mnt");
+} 
+
+# A convenience function to run a command, and print output if $quiet isn't set
+
+sub mysystem {
+    my ($cmd, $premessage) = @_;
+    if($quiet) {
+        return !system("$cmd 2>/dev/null 1>/dev/null");
+    } else {
+        print "$premessage\n" if $premessage;
+        return !system("$cmd");
+    }
+}
+
+# A convenience function to print the message only $quiet is not set.  This should
+# only be used for informational messages, as opposed to error messages.  -BEF-
+sub message {
+    my $msg = shift;
+    return 1 if $quiet;
+    print "$msg\n";
+}
+
+sub simple_arch {
+    my $arch = shift || (uname)[4];
+    $arch =~ s/i.86/i386/;
+    return $arch;
+}
+
+# A pure perl which command
+
+sub which {
+    my $file = shift;
+    foreach my $path (split(/:/,$ENV{PATH})) {
+        if(-x "$path/$file") {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+sub version {
+    my $progname = basename($0);
+    print <<EOF;
+$progname (part of Rsyphon) v$VERSION
+    
+Copyright (C) 1999-2006 Brian Elliott Finley <brian\@thefinleys.com>
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOF
+}
+
+sub usage {
+    my $progname = basename($0);
+    version();
+    print <<EOF;
+
+Usage: $progname [OPTION]... --out-file FILE
+
+Options: (options can be presented in any order and may be abbreviated)
+
+ --help             
+    Display this output.
+
+ --version          
+    Display version and copyright information.
+
+ --out-file FILE    
+    Name of the the ISO image file that will be produced.
+
+ --kernel FILE      
+    Optionally specify an alternate autoinstall kernel.
+
+ --initrd FILE      
+    Optionally specify an alternate autoinstall ramdisk.
+
+ --append "STRING"  
+    A string of options that will be passed to the autoinstall kernel.
+
+ --flavor FLAVOR    
+    The flavor of the boot package to use.  If this option is not
+    specified,  you will be asked to choose a flavor from the available
+    list interactively.
+
+ --arch ARCH        
+    Create an auto-install CD image for an architecture other than that
+    of this host.
+
+ --quiet            
+    Don\'t print any output, just provide an appropriate exit code.
+
+Download, report bugs, and make suggestions at:
+http://rsyphon.org/
+
+EOF
+}

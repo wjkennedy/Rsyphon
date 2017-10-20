@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# "Rsyphon"
+#
+
+[ "x$1" = "x" ] && poweroff && exit 0
+[ "$1" = "-r" ] && reboot && exit 0
+exit 1

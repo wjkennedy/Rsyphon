@@ -1,0 +1,25 @@
+ $Id$
+
+07  Welcome to
+0c     ____            _                04 ___                                 
+0c    / ___| _   _ ___| |_ ___ _ __ ___ 04|_ _|_ __ ___   __ _  __ _  ___ _ __ 
+0c    \___ \| | | / __| __/ _ \ '_ ` _ \ 04| || '_ ` _ \ / _` |/ _` |/ _ \ '__|
+0c     ___) | |_| \__ \ ||  __/ | | | | |04| || | | | | | (_| | (_| |  __/ |   
+0c    |____/ \__, |___/\__\___|_| |_| |_|04___|_| |_| |_|\__,_|\__, |\___|_|   
+0c           |___/                       04                    |___/           
+
+07  This is Rsyphon vSYSTEMIMAGER_VERSION_STRING
+
+0f  >>> If you do not want this system to be autoinstalled, power off now! <<<
+
+08  The autoinstall system will partition your hard drives, create filesystems
+08  on those partitions, and create your swap space.  It will then contact your
+08  imageserver and install the designated image on this machine.
+
+08  If you find this software useful, please consider making contributing code
+08  or documentation to the project.  Thanks!
+
+08  You can find documentation and support at 09http://www.rsyphon.org
+
+07  Have fun!
+

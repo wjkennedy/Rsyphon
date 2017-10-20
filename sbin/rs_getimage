@@ -1,0 +1,648 @@
+#!/usr/bin/perl -w
+
+#
+# "Rsyphon" 
+#
+#  Copyright (C) 1999-2010 Brian Elliott Finley 
+#
+#  $Id$
+#
+#  Others who have contributed to this code (in alphabetical order):
+#    Phil Champon <pchampon@valueweb.net>
+#    Sean Dague <sean@dague.net>
+#    Ian McLeod <ian@valinux.com>
+#    James Oakley <joakley@solutioninc.com>
+#    Laurence Sherzer <lsherzer@gate.net>
+#    Wesley Smith <wessmith@engr.sgi.com>
+#    Curtis Zinzilieta <czinzilieta@valinux.com>
+#
+#   2004.06.01 Brian Elliott Finley
+#   - call record_image_retrieval_time function
+#   2004.06.24 Brian Elliott Finley
+#   - call record_image_retrieved_from function
+#   2004.09.21  Brian Elliott Finley
+#   - changed some -option -> --option verbiage
+#   2004.09.28  Brian Elliott Finley
+#   - changed addclients to rsaddclients
+#
+
+# TODO XXX
+# - touch image directory after each getimage
+
+# set system path for system() calls
+$ENV{PATH} = "/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin";
+
+# version
+$version_number="SYSTEMIMAGER_VERSION_STRING";
+
+# miscellaneous variables and what not
+# NIS domain name will be figured out automatically (if it exists)
+$nisdomain="";
+
+# use the long options module to allow us to use, well, long options ;)
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use Getopt::Long;
+use Socket;
+use Rsyphon::Server;
+use Rsyphon::Common;
+use Rsyphon::Config;
+use Rsyphon::Options;
+use vars qw($config $VERSION);
+
+my $config_dir = "/etc/rsyphon";
+
+### BEGIN parse the config file ###
+#
+my $rsync_stub_dir = $config->rsync_stub_dir();
+unless ($rsync_stub_dir) {
+    die "FATAL: parameter RSYNC_STUB_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $autoinstall_script_dir = $config->autoinstall_script_dir();
+unless ($autoinstall_script_dir) {
+    die "FATAL: parameter AUTOINSTALL_SCRIPT_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $autoinstall_boot_dir = $config->autoinstall_boot_dir();
+unless ($autoinstall_script_dir) {
+    die "FATAL: parameter AUTOINSTALL_BOOT_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $rsyncd_conf = $config->rsyncd_conf();
+unless ($rsyncd_conf) {
+    die "FATAL: parameter RSYNCD_CONF is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $default_image_dir = $config->default_image_dir();
+unless ($default_image_dir) {
+    die "FATAL: parameter DEFAULT_IMAGE_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+my $default_override_dir = $config->default_override_dir();
+unless ($default_override_dir) {
+    die "FATAL: parameter DEFAULT_OVERRIDE_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+### END parse the config file
+
+### BEGIN Program ###
+
+# figure out the program name
+$0  =~ /(.*)\/+([^\/]*)$/;
+$program_name = $2;
+
+$version_info = <<"EOF";
+$program_name (part of Rsyphon) v$version_number
+
+EOF
+
+$version_info .= Rsyphon::Options->copyright();
+
+$get_help = "          Try \"$program_name --help\" for more options.";
+
+# set help information
+$help_info = $version_info .  Rsyphon::Options->getimage_options_header();
+$help_info = $help_info .  Rsyphon::Options->generic_options_help_version();
+$help_info = $help_info .  Rsyphon::Options->getimage_options_body();
+$help_info = $help_info .  Rsyphon::Options->generic_footer();
+
+
+my $golden_client;
+my $imageserver;
+my $ip_assignment_method;
+my $image;
+my $exclude_file;
+my $update_script;
+my $post_install = "beep"; # the default
+
+# It is not intended that auto_install_script_conf be passable as an option on
+# the getimage command line.  See rsmkautoinstallscript if you want to specify 
+# an alternate config file. -BEF-
+#
+my $auto_install_script_conf;   
+
+### BEGIN evaluate options ###
+GetOptions( 
+    "golden-client=s"   => \$golden_client,
+    "server=s"          => \$imageserver,
+    "image=s"           => \$image,
+    "overrides=s"       => \$overrides,
+    "directory=s"       => \$default_image_dir,
+    "ip-assignment=s"   => \$ip_assignment_method,
+    "exclude=s"         => \my @excludes,
+    "exclude-file|exclude-from=s"    => \$exclude_file,
+    "update-script=s"   => \$update_script,
+    "post-install=s"    => \$post_install,
+    "listing"           => \$listing,
+    "autodetect-disks"  => \$autodetect_disks,
+    "ssh-user=s"        => \$ssh_user,
+    "log=s"             => \$log,
+    "help"              => \$help,
+    "version"           => \$version,
+    "quiet"             => \$quiet
+) || die "$help_info";
+
+$update_script = lc $update_script;
+
+#if requested, print help information
+if ($help) { 
+  print "$help_info";
+  exit 0;
+}
+
+# if requested, print version and copyright information
+if ($version) {
+  print "$version_info";
+  exit 0;
+}
+
+# be sure program is run by root
+Rsyphon::Common->check_if_root();
+
+if($imageserver){
+  die "\n$program_name: --server is now depricated.  Try the rscpimage command instead.\n$get_help\n\n";
+}
+
+# be sure $golden_client name doesn't start with a hyphen
+if ($golden_client) {
+  if ($golden_client =~ /^-/) { 
+    die "\n$program_name: Golden client name can't start with a hyphen.\n$get_help\n\n";
+  }
+  $source_host = $golden_client;
+}
+
+# both a source host and image must be set.
+unless ($source_host and $image) {
+    die "\n$program_name: You must specify --golden-client and --image.\n$get_help\n\n";
+}
+
+
+# be sure $image doesn't start with a hyphen
+if($image){
+  if ($image =~ /^-/) { 
+    die "\n$program_name: Image name can't start with a hyphen.\n$get_help\n\n";
+  }
+}
+
+# be sure $default_image_dir is an absolute path starting with /
+unless ($default_image_dir =~ /^\//) { 
+  die "\n$program_name: --directory must be an absolute path starting with \"/\".\n$get_help\n\n";
+}
+
+if(defined($quiet) and !defined($ip_assignment_method)) {
+    die "\n$program_name: --ip-assignment must be specified when using --quiet.\n$get_help\n\n";
+}
+
+# be sure each $exclude is an absolute path starting with /
+foreach my $exclude (@excludes){
+  unless($exclude =~ /^\//){ 
+    die "\n$program_name: --exclude must be an absolute path starting with \"/\".\n$get_help\n\n";
+  }
+}
+
+# be sure $update_script was passed a proper option
+unless(
+       ($update_script eq ""   )
+    or ($update_script eq "yes")
+    or ($update_script eq "no" )
+) { die "\n$program_name: --update-script must be yes or no.\n$get_help\n\n"; }
+
+Rsyphon::Server->validate_ip_assignment_option($ip_assignment_method);
+Rsyphon::Server->validate_post_install_option($post_install);
+
+# only golden client or server may be set
+if (@excludes and $exclude_file) {
+  die "\n$program_name: Either use --exclude or --exclude-file but not both.\n$get_help\n\n";
+}
+
+# if -exclude-file is used, exclude file must exist
+if ($exclude_file) {
+  unless(-e $exclude_file){
+    die "\n$program_name: I can\'t find the exclude file specified by -exclude-file!\n$get_help\n\n";
+  }
+}
+### END evaluate options ###
+
+# Set script_name.
+my $script_name = $image;
+
+# fill in variables based on options passed
+$final_exclude_file = "/tmp/.exclude.$image";
+$imagedir = "$default_image_dir/$image";
+
+$warning =  <<"EOF";
+This program will get the \"$image\" system image from \"$source_host\"
+making the assumption that all filesystems considered part of the
+system image are using ext2, ext3, ext4, jfs, FAT, reiserfs, or xfs.
+
+This program will not get /proc, NFS, or other filesystems
+not mentioned above.
+
+*********************************** WARNING *********************************** 
+All files retrieved from a golden client are, by default, made accessible to 
+anyone who can connect to the rsync port of this machine.  See rsyncd.conf(5)
+for details on restricting access to these files on the imageserver.  See the
+rsyphon-ssh package for a more secure (but less effecient) method of 
+making images available to clients.
+*********************************** WARNING *********************************** 
+
+See \"rsgetimage --help\" for command line options.
+
+EOF
+
+# give warning
+if (!$quiet) {
+    system("clear");
+    print $warning;
+    print "Continue? ([y]/n): ";
+    $continue = Rsyphon::Common->get_response('y');
+    ($continue ne "n") or die "$program_name: No files were modified.\n";
+    print "\n";
+}
+
+if (! -d "$default_image_dir")  {
+    mkdir("$default_image_dir", 0750) or die "$program_name: Can't make directory $default_image_dir\n";
+}
+
+if (-d "$imagedir") {
+    if (!$quiet) {
+        print "An image named \"$image\" already exists...\n";
+        print "Update existing image? ([y]/n): ";
+        $continue = Rsyphon::Common->get_response('y');
+        ($continue ne "n") or die "$program_name: No files were modified.\n";
+        print "\n";
+    }
+} else  {
+    mkdir("$imagedir", 0777) || 
+	die "$program_name: Can't make directory $imagedir\n";
+}
+
+# Set default rsync port number
+$port="873";
+
+# If we're using SSH, go ahead and establish port forwarding
+if($ssh_user) {
+  # Get a random port number (normal rsync port won't work if rsync daemon is running)
+  my $port_in_use="yes";
+  until ( $port_in_use eq "no" )
+  {
+    $port_in_use="no";
+    $port = rand 60000;
+    $port =~ s/\..*//;
+
+    # Be sure port isn't reserved
+    $file="/etc/services";
+    open (FILE, "<$file") || die ("$0: Couldn't open $file for reading\n");
+      while (<FILE>) {
+        if (/$port/) { 
+          $port_in_use="yes";
+          next;
+        }
+      }
+    close FILE;
+  
+    # Be sure port isn't in use
+    open (NETSTAT, "netstat -tn |");
+    while (<NETSTAT>) {
+      (my $junk, my $port_and_junk) = split (/:/);
+      if ($port_and_junk) { 
+        (my $netstat_port, my $other_junk) = split (/ +/, $port_and_junk);
+        if ($netstat_port = /$port/) { 
+          $port_in_use="yes";
+          next;
+        }
+      }
+    }
+  }
+
+  # Setup the port forwarding
+  $command="ssh -f -l $ssh_user -L $port:$source_host:873 $source_host sleep 5";
+  $rc = 0xffff & system($command);
+  if ($rc != 0) { 
+    print "FATAL: Failed to establish secure port forwarding to $source_host!\n";
+    die   "       Be sure that you can run \"ssh -l $ssh_user $source_host\" successfully.\n";
+  }
+
+  # and change the source host to point to localhost so we can use the port forwarding
+  $source_host="127.0.0.1";
+
+  # Hold the ssh session open until all the transfers are done.
+  socket(SOCK, PF_INET, SOCK_STREAM, 0);
+  connect(SOCK, sockaddr_in($port, inet_aton($source_host)));
+}
+
+
+### BEGIN golden client stuff ###
+if($source_host) {
+  # get /etc/rsyphon/mounted_filesystems from $source_host
+  if (!$quiet) {
+    print "Retrieving /etc/rsyphon/mounted_filesystems from $source_host to check for mounted filesystems...\n";
+
+    my $directory="${imagedir}/etc/";
+    unless (-d "$directory") { mkdir("$directory", 0755) || die "$program_name: Can't make directory $directory\n"; }
+
+    $directory="${imagedir}/etc/rsyphon/";
+    unless (-d "$directory") { mkdir("$directory", 0755) || die "$program_name: Can't make directory $directory\n"; }
+
+    $command = "rsync -av --numeric-ids";
+    if ($log) { $command = $command . qq( --log-format="$log"); }
+    if ($ssh_user) { $command = $command . " --bwlimit=10000"; }
+    $command =  $command . " rsync://${source_host}:${port}/root/etc/rsyphon/mounted_filesystems ${imagedir}/etc/rsyphon/mounted_filesystems";
+
+    open(RSYNC, "$command|");
+    print "------------- $source_host mounted_filesystems RETRIEVAL PROGRESS -------------\n";
+    while (<RSYNC>) {
+      print;
+    }
+    print "------------- $source_host mounted_filesystems RETRIEVAL FINISHED -------------\n";
+    close(RSYNC);
+  } else {
+
+    $directory="${imagedir}/etc/";
+    unless (-d "$directory") { mkdir("$directory", 0755) || die "$program_name: Can't make directory $directory\n"; }
+
+    $directory="${imagedir}/etc/rsyphon/";
+    unless (-d "$directory") { mkdir("$directory", 0755) || die "$program_name: Can't make directory $directory\n"; }
+
+    $command = "rsync -a --numeric-ids";
+    if ($log) { $command = $command . qq( --log-format="$log"); }
+    if ($ssh_user) { $command = $command . " --bwlimit=10000"; }
+    $command = $command . " rsync://${source_host}:${port}/root/etc/rsyphon/mounted_filesystems ${imagedir}/etc/rsyphon/mounted_filesystems";
+
+    system($command);
+  }
+  
+  # $? is the return value from rsync
+  if ($?) {
+    print "Failed to retrieve /etc/rsyphon/mounted_filesystems from $source_host.\n";
+    print "$program_name: Have you run \"rsprepareclient\" on $source_host?\n";
+    print "          If you see the message \"unrecognised option\" above, check\n";
+    print "          http://rsyphon.org/download/ to be sure that you are running\n";
+    die   "          the recommended version of rsync.\n";
+  }
+  
+  # create list of filesystems to *not* get
+  $file="${imagedir}/etc/rsyphon/mounted_filesystems";
+  open (FILE, "<$file") || die ("$program_name: Couldn't open $file for reading!\n");
+    @mounted_filesystems = <FILE>;
+  close FILE;
+
+  $file="$final_exclude_file";
+  open (FINAL_EXCLUDE_FILE, ">$file") || die "$program_name: Couldn't open $file for writing!\n";
+    @mounted_filesystems = grep (!/\s+ext2\s+/, @mounted_filesystems);
+    @mounted_filesystems = grep (!/\s+ext3\s+/, @mounted_filesystems);
+    @mounted_filesystems = grep (!/\s+ext4\s+/, @mounted_filesystems);
+    @mounted_filesystems = grep (!/\s+reiserfs\s+/, @mounted_filesystems);
+    @mounted_filesystems = grep (!/\s+jfs\s+/, @mounted_filesystems);
+    @mounted_filesystems = grep (!/\s+xfs\s+/, @mounted_filesystems);
+    @mounted_filesystems = grep (!/\s+vfat\s+/, @mounted_filesystems);
+    @mounted_filesystems = grep (!/\s+fat\s+/, @mounted_filesystems);
+    print FINAL_EXCLUDE_FILE "\n# Automatic exclusions made by Rsyphon.\n";
+    
+    foreach (@mounted_filesystems) {
+      /\S+\s+\S+\s+(\S+)\s+/;
+      my $mount_point=$1;
+      print FINAL_EXCLUDE_FILE "$mount_point/*\n";
+    }
+    # Add common patterns that should be always excluded.
+    if (open(COMMON_EXCLUDE_FILE, "</etc/rsyphon/getimage.exclude")) {
+        while (<COMMON_EXCLUDE_FILE>) {
+            print FINAL_EXCLUDE_FILE "$_";
+        }
+        close(COMMON_EXCLUDE_FILE);
+    } else {
+        print STDERR "WARNING: couldn't open /etc/rsyphon/getimage.exclude, skipping common exclusions...\n";
+    }
+    if(@excludes) { 
+     print FINAL_EXCLUDE_FILE "\n# Exclusions from --exclude on the command line.\n";
+      foreach $exclude (@excludes) {
+        print FINAL_EXCLUDE_FILE "$exclude\n";
+      }
+    }
+    if($exclude_file) { 
+      print FINAL_EXCLUDE_FILE "\n# Exclusions from --exclude-file.\n";
+      $file="$exclude_file";
+      open (EXCLUDE_FILE, "<$file") || die "$program_name: Couldn't open $file for reading!\n";
+        while(<EXCLUDE_FILE>){
+          print FINAL_EXCLUDE_FILE "$_";
+	}
+      close EXCLUDE_FILE;
+    }
+  close FINAL_EXCLUDE_FILE;
+
+  # Print all exclusions.
+  if (!$quiet) {
+    open (FINAL_EXCLUDE_FILE, "<$final_exclude_file") || 
+        die "$program_name: Couldn't open $final_exclude_file for reading!\n";
+    while (<FINAL_EXCLUDE_FILE>) {
+        print $_;
+    }
+    close FINAL_EXCLUDE_FILE;
+  }
+
+  # compile rsync options
+  $options = "--delete --delete-excluded --exclude-from=$final_exclude_file";
+  if ($log) { $options = $options . qq( --log-format="$log"); }
+  if ($ssh_user) { $options = $options . " --bwlimit=10000"; }
+  $options = $options . " rsync://${source_host}:${port}/root/ $imagedir/";
+}
+### END golden client stuff ###
+
+### BEGIN generic image retrieval stuff ###
+# Get the image from the specified host
+if (!$quiet) {
+    print "\n\nRetrieving image $image from $source_host\n";
+    open (RSYNC, "rsync -aHSv --numeric-ids $options |");
+    print "------------- $image IMAGE RETRIEVAL PROGRESS -------------\n";
+    while (<RSYNC>) {
+        print $_;
+    }
+    print "------------- $image IMAGE RETRIEVAL FINISHED -------------\n";
+    close (RSYNC);
+} else {
+    $command = qq(rsync -aHS --numeric-ids $options);
+    !system($command) or die("$program_name: Failed to retrieve image $image from $source_host.\n");
+}
+
+# Send the completion signal to the remote rsync daemon.
+system('rsync ' . "rsync://${source_host}:${port}/" . $Rsyphon::Common::rsync_magic_string . '/ >/dev/null 2>&1');
+# Close ssh tunnel.
+close(SOCK) if ($ssh_user); 
+
+if(!$quiet) {
+    print "\nPress <Enter> to continue...";
+    <STDIN>;
+}
+
+unlink $final_exclude_file || die "$program_name: Removal of file $final_exclude_file failed\n";
+
+# Add entry to image server's rsyncd.conf if necessary
+Rsyphon::Server->create_image_stub($rsync_stub_dir, $image, $imagedir) or 
+    die "$program_name: Cannot create rsync stub entry in $rsync_stub_dir";
+
+Rsyphon::Server->gen_rsyncd_conf($rsync_stub_dir, $rsyncd_conf) or
+    die "$program_name:  Cannot generate $rsyncd_conf";
+
+if (
+    Rsyphon::Server->copy_boot_files_from_image_to_shared_dir(
+        $image, $imagedir, $rsync_stub_dir, $autoinstall_boot_dir
+    ) == -1
+) {
+    print "WARNING: failed to copy boot files from the image (ignore this warning if you are not using UYOK).\n";
+}
+
+### END generic image retrieval stuff ###
+
+# Add image entry to flamethrower.conf file
+my $flamethrower_conf = "/etc/rsyphon/flamethrower.conf";
+my $entry_name = $image;
+my $new_entry_data = "[$image]\nDIR = $imagedir\n";
+if(-e $flamethrower_conf) {
+    Rsyphon::Common->add_or_delete_conf_file_entry($flamethrower_conf, $entry_name, $new_entry_data) or 
+        die "$program_name: Cannot add entry to $flamethrower_conf";
+
+    # Add override entry to flamethrower.conf file
+    $entry_name = "override_" . $image;
+    $new_entry_data = "[override_$image]\nDIR = $default_override_dir/$image\n";
+    Rsyphon::Common->add_or_delete_conf_file_entry($flamethrower_conf, $entry_name, $new_entry_data) or 
+        die "$program_name: Cannot add entry to $flamethrower_conf";
+}
+
+Rsyphon::Server->record_image_retrieval_time($imagedir);
+Rsyphon::Server->record_image_retrieved_from($imagedir,$golden_client);
+
+### BEGIN Overwrite $script_name.master? ###
+if( (!$quiet) and (!$update_script) and (-e "$autoinstall_script_dir/$script_name.master") ) {
+    system("clear");
+    print "Update Autoinstall Script?\n";
+    print "--------------------------\n\n";
+    print "An autoinstall script for this image already exists.  It is recommended\n";
+    print "that you update this autoinstall script, unless you have customized it.\n";
+    print "(You will know if you have customized it.)\n\n";
+    print "Would you like to update the autoinstall script for this image? ([y]/n): ";
+
+    $update_script = Rsyphon::Common->get_response('yes');
+    $update_script = lc $update_script;
+
+    # if user actually hits "y", deal with it
+    if($update_script eq "y") { $update_script = "yes"; }
+}
+
+# If it just ain't there yet, make it and don't even ask about it.
+elsif(! -e "$autoinstall_script_dir/$script_name.master") {
+    $update_script="yes";
+}
+
+# if we don't need to update the master script, then exit -- we're done
+unless($update_script eq "yes") { exit 0; }
+
+### END Overwrite $script_name.master? ###
+
+
+### BEGIN Got NIS? ###
+$file="$imagedir/etc/sysconfig/network";
+if(open (NETWORK, "< $file")) {
+    while (<NETWORK>) {
+        if (/^NISDOMAIN\s*\=\s*(\S+)/) {
+            $nisdomain = $1;
+        }
+    }
+    close (NETWORK);
+}
+### END Got NIS? ###
+
+
+### BEGIN IP Assignment Method ###
+if((!$quiet) and (!$ip_assignment_method))
+{
+    $satisfied="n";
+    $ip_assignment_method="1";
+    until($satisfied eq "y")
+    {
+        system("clear");
+        print << 'EOF';
+IP Address Assignment
+---------------------
+
+There are three ways to assign IP addresses to the client systems on an
+ongoing basis:
+
+1) DHCP
+   ----------------------------------------------------------------
+   A DHCP server will assign IP addresses to clients installed with
+   this image.  They may be assigned a different address each time.
+   If you want to use DHCP, but must ensure that your clients
+   receive the same IP address each time, see "man rsmkdhcpstatic".
+
+2) STATIC
+   ----------------------------------------------------------------
+   The IP address the client uses during autoinstall will be
+   permanently assigned to that client.
+
+3) REPLICANT
+   ----------------------------------------------------------------
+   Don't mess with the network settings in this image.  I'm using
+   it as a backup and quick restore mechanism for a single machine.
+
+EOF
+
+        print "Which method do you prefer? [$ip_assignment_method]: ";
+        $ip_assignment_method=Rsyphon::Common->get_response($ip_assignment_method);
+        print "You have chosen method $ip_assignment_method for assigning IP addresses.\n";
+        print "\nAre you satisfied? ([y]/n): ";
+        $satisfied=Rsyphon::Common->get_response('y');
+	unless(
+	           ($ip_assignment_method == "1")
+                or ($ip_assignment_method == "2")
+                or ($ip_assignment_method == "3")
+	      )
+              {
+                 # reset to default
+                 $ip_assignment_method = "1";
+                 # send 'em back through the wringer
+                 $satisfied="n" ;
+              }
+    }
+
+# turn number values into useable string values
+if   ($ip_assignment_method == "1") { $ip_assignment_method = "dhcp" ; }
+elsif($ip_assignment_method == "2") { $ip_assignment_method = "static"      ; }
+elsif($ip_assignment_method == "3") { $ip_assignment_method = "replicant"; }
+}
+### END IP Assignment Method ###
+
+### BEGIN create a fresh master autoinstall script ###
+# If not specified, use default for autoinstallscript.conf. -BEF-
+unless ($auto_install_script_conf) {
+    $auto_install_script_conf = "${imagedir}/etc/rsyphon/autoinstallscript.conf";
+}
+unless (-f $auto_install_script_conf) {
+    die "ERROR: I can't find the autoinstallscript.conf file. See autoinstallscript.conf(8) for details.\n";
+}
+
+Rsyphon::Server->validate_auto_install_script_conf( $auto_install_script_conf );
+
+Rsyphon::Server->create_autoinstall_script(
+	$script_name,
+	$autoinstall_script_dir,
+	$config_dir,
+	$image,
+	$overrides,
+	$imagedir,
+	$ip_assignment_method,
+	$post_install,
+        $listing,
+    $auto_install_script_conf,
+    $autodetect_disks,
+);
+### END create a fresh master autoinstall script ###
+
+# prompt to run "rsclusterconfig"
+if (!$quiet) {
+    print "Would you like to run the \"rsclusterconfig\" utility now? (y/[n]): ";
+    $continue = Rsyphon::Common->get_response('n');
+    ($continue ne "n") or exit 0;
+    my $cmd = "rsclusterconfig -e";
+    exec($cmd);
+}
+
+print  <<"EOF";
+The image \"$image\" has been successfully configured.
+
+Remember to register your cluster(s) at:
+   http://www.rsyphon.org/cluster-register
+EOF

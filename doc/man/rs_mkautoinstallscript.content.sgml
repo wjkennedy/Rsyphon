@@ -1,0 +1,264 @@
+  <refentryinfo>
+    <address>
+      &dhemail;
+    </address>
+    <author>
+      &dhfirstname;
+      &dhsurname;
+    </author>
+    <copyright>
+      <year>2001</year>
+      <holder>&dhusername;</holder>
+    </copyright>
+    &dhdate;
+  </refentryinfo>
+  <refmeta>
+    <refentrytitle>RS_MKAUTOINSTALLSCRIPT</refentrytitle>
+
+    &dhsection;
+  </refmeta>
+  <refnamediv>
+    <refname>rsmkautoinstallscript</refname>
+
+    <refpurpose>
+        create a Rsyphon autoinstallscript
+    </refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>rsmkautoinstallscript</command>
+      <arg><option>--help</option></arg>
+      <arg><option>--version</option></arg>
+      <arg><option>--quiet</option></arg>
+      <arg><option>--listing</option></arg>
+      <arg><option>--autodetect-disks</option></arg>
+      <arg><option>--image <replaceable>IMAGENAME</replaceable></option></arg>
+      <arg><option>--overrides <replaceable>LIST</replaceable></option></arg>
+      <arg><option>--script <replaceable>SCRIPTNAME</replaceable></option></arg>
+      <arg><option>--force <replaceable>[YES|NO]</replaceable></option></arg>
+      <arg><option>--config-file <replaceable>FILE</replaceable></option></arg>
+      <arg><option>--ip-assignment <replaceable>METHOD</replaceable></option></arg>
+      <arg><option>--post-install <replaceable>ACTION</replaceable></option></arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>DESCRIPTION</title>
+
+    <para>This manual page documents briefly the
+      <command>rsmkautoinstallscript</command> command.</para>
+
+    <para><command>rsmkautoinstallscript</command> creates an autoinstallscript
+      for a Rsyphon image.
+    </para>
+
+  </refsect1>
+  <refsect1>
+    <title>OPTIONS</title>
+
+    <para>A summary of options is included below.</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><option>--help</option></term>
+	<listitem><para>Show summary of options</para></listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--version</option></term>
+	<listitem>
+	  <para>Display version and copyright information.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--quiet</option></term>
+	<listitem>
+	  <para>
+	    Don't print any output, just provide an appropriate exit code.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--listing</option></term>
+        <listitem>
+          <para>
+          Show each filename as it is copied over during
+          install.  This is useful to increase the verbosity
+          of the installation when you need more informations
+          for debugging.  Do not use this option if your
+          console device is too slow (e.g. serial console),
+          otherwise it could be the bottleneck of your
+          installation.
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--image <replaceable>IMAGENAME</replaceable></option></term>
+	<listitem>
+	  <para>
+	    Where IMAGENAME is the name of the image for which you want to
+	    create a new autoinstall script.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--overrides <replaceable>LIST</replaceable></option></term>
+        <listitem>
+          <para>
+            Where LIST is the comma separated list of the
+            overrides that will be transferred to the clients
+            that use the autoinstall script.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--script <replaceable>SCRIPTNAME</replaceable></option></term>
+	<listitem>
+	  <para>
+            Where SCRIPTNAME is the base name to use for the resultant
+            autoinstall script.  If not specified, SCRIPTNAME defaults to
+            IMAGENAME.  This is most often used when you want to have multiple
+            autoinstallscripts for a single image; i.e. when you have clients
+            with different partitioning and/or filesystem schemes that use
+            the same image (same file set).
+          </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--force <replaceable>[YES|NO]</replaceable></option></term>
+	<listitem>
+	  <para>
+	    Update the $image.master script?  Defaults to NO if -quiet.  If
+	    not specified you will be prompted to confirm an updated.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--config-file <replaceable>FILE</replaceable></option></term>
+	<listitem>
+	  <para>
+            Use FILE to get autoinstallscript configuration information.
+            Defaults to
+            <filename>./etc/rsyphon/autoinstallscript.conf</filename>
+            in the image directory.
+	  </para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+    <para>
+      The following options affect the autoinstall client after autoinstalling.
+    </para>
+    <variablelist>
+      <varlistentry>
+        <term><option>--ip-assignment <replaceable>METHOD</replaceable></option></term>
+        <listitem>
+          <para>
+	    Where METHOD can be:
+	    <itemizedlist>
+	      <listitem>
+		<para>
+		  static_dhcp -- A DHCP server will assign the same static
+		  address each time to clients installed with this image.  The
+		  DHCP server in this case also assigns the corresponding host
+		  name.  It is possible therefore, when using static dhcp, to
+		  change a machine's hostname and IP address by simply changing
+		  one value in the dhcpd.conf file.  Some may find this
+		  desirable.  Also see the <command>rsmkdhcpstatic</command>
+		  command.
+		</para>
+	      </listitem>
+	      <listitem>
+		<para>
+		  dynamic_dhcp -- A DHCP server will assign IP addresses
+		  dynamically to clients installed with this image.  In dynamic
+		  dhcp, the IP address of a machine may change, but you want it
+		  to retain the same host name.  Therefore the hostname is set
+		  by the machine itself.  They may be assigned a different
+		  address each time.
+		</para>
+	      </listitem>
+	      <listitem>
+		<para>
+		  static -- The IP address the client uses during autoinstall
+		  will be permanently assigned to that client.
+		</para>
+	      </listitem>
+	      <listitem>
+		<para>
+		  replicant -- Don't mess with the network settings in this
+		  image.  I'm using it as a backup and quick restore mechanism
+		  for a single machine.
+		</para>
+		</listitem>
+	    </itemizedlist>
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>--post-install <replaceable>ACTION</replaceable></option></term>
+        <listitem>
+          <para>ACTION can be:</para>
+	  <itemizedlist>
+	    <listitem>
+	      <para>
+		beep -- Clients will beep incessantly after successful
+		completion of an autoinstall.
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+		reboot -- Clients will reboot themselves after successful
+		completion of an autoinstall.
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+		shutdown -- Clients will halt themselves after successful
+		completion of an autoinstall.
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+		kexec -- Clients will boot the kernels via kexec that were
+		just installed after successful completion of an autoinstall.
+	      </para>
+	    </listitem>
+	  </itemizedlist>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term><option>-autodetect-disks</option></term>
+        <listitem>
+          <para>
+            Try to detect available disks on the client instead
+            of using devices from autoinstallscript.conf.
+          </para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+  <refsect1>
+    <title>SEE ALSO</title>
+
+    <para>
+      <command>rsgetimage</command>(8),
+      <command>rsautoinstallscript.conf</command>(5)
+    </para>
+
+    <para>More details can be found in the <citetitle>Rsyphon
+	manual.</citetitle>
+    </para>
+  </refsect1>
+  <refsect1>
+    <title>AUTHOR</title>
+
+    <para>This manual page was compiled by &dhusername; <&dhemail;> for
+      the &debian; system (but may be used by others).</para>
+
+    <!-- <para>Permission is granted to copy, distribute and/or modify
+      this document under the terms of the <acronym>GNU</acronym> Free
+      Documentation License, Version 1.1 or any later version
+      published by the Free Software Foundation; with no Invariant
+      Sections, no Front-Cover Texts and no Back-Cover Texts.  A copy
+      of the license can be found under
+      <filename>/usr/share/common-licenses/FDL</filename>.</para> -->
+
+  </refsect1>

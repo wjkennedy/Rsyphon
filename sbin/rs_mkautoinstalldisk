@@ -1,0 +1,337 @@
+#!/usr/bin/perl -w
+#
+#  "Rsyphon"
+#
+#  Copyright (C) 2005 Andrea Righi <a.righi@cineca.it>
+
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use strict;
+use Getopt::Long;
+use POSIX qw(uname);
+use Rsyphon::Config;
+use Rsyphon::Common;
+use Rsyphon::Server;
+use vars qw($config $VERSION);
+
+my $VERSION = "SYSTEMIMAGER_VERSION_STRING";
+
+my $program_name = "rsmkautoinstalldisk";
+
+my $version_info = << "EOF";
+$program_name (part of Rsyphon) v$VERSION
+
+Copyright (C) 2006 Andrea Righi <a.righi\@cineca.it>
+
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOF
+
+my $help_info = $version_info . <<"EOF";
+
+Usage: $program_name --device FILE [OPTION]...
+
+Options: (options can be presented in any order and can be abbreviated)
+ --help                 Display this output.
+
+ --version              Display version and copyright information.
+
+ --quiet                Run silently and answer yes to all questions.
+
+ --yes                  Answer yes to all questions.
+
+ --device FILE          Target device that will be used for the
+                        autoinstallation.
+
+                        WARNING: ALL THE DATA IN THE DEVICE WILL BE
+                        OVERWRITTEN!
+
+ --flavor FLAVOR        Specify a flavor of boot media.
+                        (defaults to "standard").
+
+ --arch ARCH            Create an auto-install disk image for an
+                        architecture other than that of this host.
+
+ --kernel FILE          Specify an alternate autoinstall kernel.
+
+ --initrd FILE          Specify an alternate autoinstall ramdisk.
+
+ --append STRING        A string of options that will be passed to the
+                        autoinstall kernel.
+
+EOF
+
+Getopt::Long::Configure("posix_default");
+Getopt::Long::Configure("no_gnu_compat");
+Getopt::Long::Configure("bundling");
+
+GetOptions(
+	"help"		=> \my $help,
+	"version"	=> \my $version,
+	"quiet"		=> \my $quiet,
+	"yes"		=> \my $yes,
+	"device=s"	=> \my $device,
+	"flavor=s"	=> \my $flavor,
+	"arch=s"	=> \my $arch,
+	"kernel=s"	=> \my $kernel,
+	"initrd=s"	=> \my $initrd,
+	"append=s"	=> \my $append,
+) or die("$help_info");
+
+unless ($arch) {
+    $arch = (uname())[4];
+    $arch =~ s/i.86/i386/;
+}
+
+# Set the shell PATH for system() calls.
+$ENV{PATH} = '/sbin:/usr/sbin:/usr/local/sbin:' . $ENV{PATH};
+
+my $autoinstall_boot_dir = $config->autoinstall_boot_dir();
+unless ($autoinstall_boot_dir) {
+    die "FATAL: parameter AUTOINSTALL_BOOT_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+
+### BEGIN evaluate commad line options ###
+
+if ($help) {
+	print "$help_info";
+	exit(0);
+}
+if ($version) {
+	print "$version_info";
+	exit(0);
+}
+unless ($device) {
+	die("error: target device was not specified!\nTry \"--help\" for more options.\n");
+}
+unless ($kernel and $initrd) {
+	# Emulate try .. catch handling mechanism.
+	my %available_flavors;
+	eval {
+		# Check if there are available flavors for the selected
+		# architecture.
+		unless (-d "$autoinstall_boot_dir/$arch") {
+			die;
+		}
+		# Get all the available flavors.
+		%available_flavors = Rsyphon::Common->get_boot_flavors($arch, $autoinstall_boot_dir);
+		unless (%available_flavors) {
+			die;
+		}
+	};
+	if ($@) {
+		die("error: couldn't find any boot flavors for Rsyphon on $arch.\n" .
+			"Please install the appropriate boot files.\n");
+	}
+	$flavor = 'standard' if (!$flavor);
+	unless ($available_flavors{$flavor}) {
+		die(qq(\nerror: could't find boot files of flavor "$flavor" for the "$arch" architecture.\n));
+	}
+
+	my $bin_dir = "$autoinstall_boot_dir/$arch/$flavor";
+
+	$kernel = "$bin_dir/kernel" unless ($kernel);
+	$initrd = "$bin_dir/initrd.img" unless ($initrd);
+}
+unless ($append) {
+	$append = '';
+}
+
+### END evaluate command line options ###
+
+print STDERR "======================= WARNING =======================\n" .
+             " Using device: $device\n" .
+             " This command will overwrite the data on that device!!!\n" .
+             "======================= WARNING =======================\n" .
+             "\nAre you sure to continue? (y / N)? ";
+if ($quiet || $yes) {
+	print "y\n";
+} else {
+	chomp($_ = <STDIN>);
+	unless ($_ =~ /^y/i) {
+		print STDERR "$device has not been modified...\n";
+		exit(0);
+	}
+}
+print "\n";
+
+print "Using kernel: $kernel\n";
+print "Using initrd: $initrd\n";
+print "\n";
+
+my ($cmd, $mnt_dir, $is_mounted);
+
+print "Creating DOS filesystem in $device...\n";
+run_cmd("mkdosfs -I $device");
+print "Using \"syslinux\" to make a bootable device...\n";
+run_cmd("syslinux $device");
+
+# Create a unique temporary mount point.
+print "Creating temporary mount point...\n";
+$mnt_dir = "/tmp/.autoinstalldiskette.$$";
+while (-e $mnt_dir) {
+	$mnt_dir .= ".$$";
+}
+mkdir($mnt_dir, 0770) or
+	die "error: couldn't create temporary mount point $mnt_dir.\n";
+
+# Cleanup routine.
+$SIG{__DIE__} = sub {
+	my $msg = shift;
+	if ($is_mounted) {
+		run_cmd("sudo umount $mnt_dir || true");
+	}
+	if (-d $mnt_dir) {
+		rmdir($mnt_dir) or
+		        die("error: couldn't remove temporary mount point $mnt_dir\n");
+	}
+	die $msg;
+};
+
+# Mount the filesystem.
+my $loop;
+unless (-b $device) {
+	$loop = '-o loop';
+} else {
+	$loop = '';
+}
+print "Temporary mounting device $device...\n";
+run_cmd("sudo mount -t msdos -o umask=0007 -o uid=$< $loop $device $mnt_dir");
+$is_mounted = 1;
+
+# Copy boot stuff to the device.
+eval {
+	Rsyphon::Server->copy_boot_files_to_boot_media(
+		$kernel, $initrd, undef, $arch,
+		$mnt_dir, $append);
+};
+if ($@) {
+	die("error: couldn't copy required files into the image!\n");
+}
+
+# Unmount the device.
+print "Un-mounting device $device...\n";
+run_cmd("sudo umount $device");
+$is_mounted = 0;
+
+# Get rid of temporary directory.
+print "Removing temporary mount point...\n";
+rmdir($mnt_dir) or
+	die("error: couldn't remove temporary mount point $mnt_dir\n");
+
+# Well done.
+print "Done!\n";
+exit(0);
+
+# Usage:
+# run_cmd($host);
+# Description:
+#       Run a command with system() and die on error.
+sub run_cmd
+{
+	my $cmd = shift;
+	print " >> $cmd\n" unless ($quiet);
+	!system($cmd) or die("error: $cmd");
+}
+
+__END__
+
+=head1 NAME
+
+rsmkautoinstalldisk - generate a bootable disk (typically USB disk) for
+autoinstalling clients
+
+=head1 SYNOPSIS
+
+rsmkautoinstalldisk --device FILE [OPTION] ...
+
+=head1 DESCRIPTION
+
+B<rsmkautoinstalldisk> creates a bootable disk (even a USB disk) that can be
+used to boot one or more autoinstall clients to initiate the auto-installation
+process.
+
+B<rsmkautoinstalldisk> is able to generate an image of the bootable device
+using a regular file. This is pretty useful when you have to play with virtual
+machines that are able to map devices into regular files or to make the cloning
+of the autoinstall disks easier (you can simply create a regular file and use
+dd(1) to perform the raw copy of the file into the real autoinstall devices.
+
+=head1 OPTIONS
+
+=over 8
+ 
+=item B<--help>
+
+Display a short help.
+
+=item B<--version>
+
+Display version and copyright information.
+
+=item B<--quiet>
+
+Run silently and answer yes to all questions.
+
+=item B<--yes>
+
+Answer yes to all questions.
+
+=item B<--device FILE>
+
+Target device that will be used to create the autoinstall device. It can be even
+a regular file.
+
+WARNING: ALL THE DATA IN THE DEVICE WILL BE OVERWRITTEN!!!
+
+=item B<--flavor FLAVOR>
+
+Specify a flavor of boot media (default to "standard").
+See also /usr/share/rsyphon/boot/B<arch>/*.
+
+=item B<--arch ARCH>
+
+Create an auto-install disk image for an architecture other than that of this
+host.
+
+=item B<--kernel FILE>
+
+Specify an alternate autoinstall kernel. Default is
+/usr/share/rsyphon/boot/B<arch>/B<flavor>/kernel
+
+=item B<--initrd FILE>
+
+Specify an alternate autoinstall initrd.img. Default is
+/usr/share/rsyphon/boot/B<arch>/B<flavor>/initrd.img
+
+=item B<--append STRING>
+
+A string of options appended to the autoinstall kernel boot options. For a list
+of all the valid installation parameters see:
+http://wiki.rsyphon.org/index.php/Installation_Parameters.
+
+=back
+
+=head1 SEE ALSO
+
+rsyphon(8), rsmkautoinstallcd(8), rsmkbootpackage(8), rsprepareclient(8)
+
+=head1 AUTHOR
+
+Andrea Righi <a.righi@cineca.it>.
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2003 by Andrea Righi <a.righi@cineca.it>.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut
+

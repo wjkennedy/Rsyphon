@@ -1,0 +1,444 @@
+#!/usr/bin/perl -w
+#
+#  "Rsyphon"
+#
+#  Copyright (C) 2007 Andrea Righi <a.righi@cineca.it>
+#  Copyright (C) 2013 Brian Finley <brian@thefinleys.com>
+#   - fix POD error
+#
+
+use lib "USR_PREFIX//lib/rsyphon/perl";
+use strict;
+use Getopt::Long;
+use XML::Simple;
+use Rsyphon::Config;
+use Rsyphon::HostRange;
+use vars qw($config);
+
+my $VERSION = "SYSTEMIMAGER_VERSION_STRING";
+
+my $program_name = "rsclusterconfig";
+
+my $version_info = << "EOF";
+$program_name (part of Rsyphon) v$VERSION
+
+Copyright (C) 2007 Andrea Righi <a.righi\@cineca.it>
+
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOF
+
+my $help_info = $version_info . <<"EOF";
+
+Usage (show-mode): $program_name [OPTION]... hostname|host-range|host-group...
+Usage (edit-mode): $program_name -e|-u [OPTION]...
+
+Options: (options can be presented in any order and can be abbreviated)
+ --help, -h             Display this output.
+
+ --version, -v          Display version and copyright information.
+
+ --update, -u           Force a non-interactive update of all the configuration
+                        files.
+
+ --edit, -e             Edit the cluster topology configuration in interactive
+                        mode.
+
+ --groups, -g           Show group associations for each node (this option
+                        works only in show-mode).
+
+ --image, -i            Show image associations for each node (this option
+                        works only in show-mode).
+
+EOF
+
+Getopt::Long::Configure("posix_default");
+Getopt::Long::Configure("no_gnu_compat");
+Getopt::Long::Configure("bundling");
+
+GetOptions(
+	"help|h"		=> \my $help,
+	"version|v"		=> \my $version,
+	"update|u"		=> \my $update,
+	"edit|e"		=> \my $edit,
+	"groups|g"		=> \my $show_groups,
+	"image|i"		=> \my $show_image,
+) or die("$help_info");
+
+select(STDERR);
+$| = 1;
+select(STDOUT);
+$| = 1;
+
+### BEGIN evaluate commad line options ###
+
+if ($help) {
+	print "$help_info";
+	exit(0);
+}
+
+if ($version) {
+	print "$version_info";
+	exit(0);
+}
+
+### END evaluate commad line options ###
+
+# Get cluster configuration file.
+my $database = $Rsyphon::HostRange::database;
+my $xml = XMLin($database, ForceArray => 1);
+
+# Choose the action to do.
+if (($edit) or ($update)) {
+	edit();
+} else {
+	show();
+}
+
+# Well done.
+exit(0);
+
+# Usage: show()
+# Description:
+#     Show cluster configuration.
+sub show
+{
+	# Cache hosts/groups associations in a single memory hash.
+	my $groups;
+	if ($show_groups || $show_image) {
+	        foreach my $group (Rsyphon::HostRange::sort_group(@{($xml->{'group'})})) {
+	                my $name = $group->{'name'}[0];
+			if ($show_groups) {
+		                map { push(@{$groups->{'name'}->{$_}}, $name) }
+		                        Rsyphon::HostRange::expand_groups_xml($xml, $name);
+			}
+	                my $image = $group->{'image'}[0];
+			if (defined($image) && $show_image) {
+		                map { push(@{$groups->{'image'}->{$_}}, $image) }
+		                        Rsyphon::HostRange::expand_groups_xml($xml, $name);
+			}
+	        }
+	}
+
+	# Print group/host/host-range info.
+	unless (@ARGV) {
+		# If no argument are passed show all clients.
+		push(@ARGV, $xml->{'name'}[0]);
+	}
+	foreach (Rsyphon::HostRange::expand_groups_xml($xml, join(' ', @ARGV))) {
+	        print "$_";
+	        if ($show_image) {
+                        print ':image=' . ($groups->{'image'}->{$_}[0] || '<NULL>');
+		}
+	        if ($show_groups) {
+	                if (defined($groups->{'name'}->{$_})) {
+	                        print ':groups=' . join(',', @{$groups->{'name'}->{$_}});
+	                } else {
+	                        print ': does not belong to any group!';
+	                }
+		}
+	        print "\n";
+	}
+}
+
+# Usage: show()
+# Description:
+#     Change cluster configuration.
+sub edit
+{
+	# This program must be run as root.
+	unless ($< == 0) {
+		die("FATAL: $program_name requires root privileges to run in edit-mode.\n");
+	}
+
+	my $script_dir = $config->autoinstall_script_dir();
+	unless ($script_dir) {
+		die "FATAL: parameter AUTOINSTALL_SCRIPT_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+	}
+
+	# Get a valid system editor (only if in interactive mode).
+	my $editor = '';
+	if ($edit) {
+		if (defined($ENV{'EDITOR'})) {
+			$editor = $ENV{'EDITOR'};
+		} else {
+			my @ed_list = ('vim', 'vi', 'nano', 'nano-tiny');
+			foreach my $e (@ed_list) {
+				if (system("$e --version &>/dev/null") == 0) {
+					$editor = $e;
+					last;
+				}
+			}
+		}
+		unless ($editor) {
+			die("FATAL: couldn't find a valid editor (vi, vim, nano or nano-tiny)!\n");
+		}
+	}
+	my $mtime = (stat($database))[9];
+	while (1) {
+		# Edit the configuration file.
+		unless ($update) {
+			system "$editor $database";
+		}
+		# Check syntax after editing.
+		if (XML_check_syntax()) {
+			print STDERR "ERROR: syntax error in $database!\n";
+			print STDERR "$@\n";
+			my $ans;
+			unless ($update) {
+				print "Edit again? (y | n) ";
+				chomp($ans = <STDIN>);
+			} else {
+				$ans = 'n';
+			}
+			if (lc($ans) eq 'y') {
+				next;
+			} else {
+				print STDERR "WARNING: $database still contains errors! Please fix it.\n";
+				exit(1);
+			}
+		}
+		last;
+	}
+
+	my $output_file;
+
+	# Cache XML info into a plain text file. This is needed to easily parse this
+	# file in the busybox environment when the clients are imaging.
+	$output_file = $script_dir . '/cluster.txt';
+	if (($update) || ($mtime != (stat($database))[9])) {
+		print "Caching XML configuration... ";
+		if (!XML_info_to_plain_file($output_file)) {
+			print "[  OK  ]\n";
+		} else {
+			die("\nERROR: failed to cache XML informations!\n");
+		}
+	}
+
+	# Synchronize /etc/hosts to the hosts file read by the imaging clients.
+	$output_file = $script_dir . '/hosts';
+	if (($update) || !(-e $output_file) ||
+	    ((stat('/etc/hosts'))[9] != (stat($output_file))[9])) {
+		print "Synchronizing /etc/hosts to $output_file ... ";
+		if (!sync_etc_hosts($output_file)) {
+			print "[  OK  ]\n";
+		} else {
+			die("\nERROR: couldn't synchronize /etc/hosts to $output_file!\n");
+		}
+	}
+}
+
+# Usage: XML_check_syntax()
+# Description:
+#   Check the syntax of the XML configuration file
+#   /etc/rsyphon/cluster.xml. Return 0 in case of success.
+sub XML_check_syntax
+{
+	# Refresh XML structure.
+	$xml = eval { XMLin($database, ForceArray => 1) };
+	if (@_) {
+		return -1;
+	}
+
+	# Check if a global name has been defined.
+	unless ($xml->{'name'}[0]) {
+		print "WARNING: the global name is undefined! " .
+		      "Please add a <name>...</name> tag to identify all your clients.\n";
+		return -1;
+	}
+
+	# Check if a base override has been defined.
+	unless ($xml->{'override'}) {
+		print "WARNING: a global override was not defined! " .
+		      "Please define it (even empty if you don't need it).\n";
+		return -1;
+	}
+
+	foreach my $group (@{$xml->{'group'}}) {
+		# Every group must have a name.
+		unless (defined($group->{'name'}[0])) {
+			print "WARNING: there is a group withtout name! Please define a name for that group.\n";
+			return -1;
+		}
+		# Check for deprecated tags.
+		if (defined($group->{'base_image'}[0])) {
+			print "WARNING: the tag <base_image> used in the group " .
+			      "\"$group->{'name'}[0]\" is deprecated, use <override> instead!\n";
+			return -1;
+		}
+		# Check non-numeric values for priority.
+		if (defined($group->{'priority'}[0])) {
+			if ($group->{'priority'}[0] !~ /^\s*[0-9]+\s*$/) {
+				print "WARNING: the group \"$group->{'name'}[0]\" doesn't have a numeric value of <priority>!\n";
+				return -1;
+			}
+		}
+	}
+	return 0;
+}
+
+# Usage: XML_info_to_plain_file($output_file)
+# Description:
+#   Convert the cluster configuration defined from the XML file
+#   /etc/rsyphon/cluster.xml into a plain txt file given as argument.
+sub XML_info_to_plain_file
+{
+	my $dest = shift;
+
+	# Cache groups in a hash struct.
+	my $groups;
+	map { $groups->{$_->{'name'}[0]} = $_ } @{$xml->{'group'}};
+
+	# Write the plain text file (cache).
+	open(OUT, ">$dest") or return -1;
+
+	# Print header (this is only for debugging purpose).
+	print OUT "#\n# hostname:group:imagename(group):override(group)\n#\n";
+
+	# First entry is reserved to store the global override.
+	print OUT '# global_override=:' . (join(' ', reverse @{$xml->{override}}) or '') . ":\n#\n";
+
+	# Resolve the groups in lists of nodenames.
+	foreach my $group (Rsyphon::HostRange::sort_group(@{$xml->{'group'}})) {
+		my $name = $group->{'name'}[0];
+		my @all_hosts = Rsyphon::HostRange::expand_groups_xml($xml, $name);
+
+		# Add entries in /etc/hosts.
+		my $ip_range = $group->{'ip-range'}[0];
+		my $domain_name = $group->{'domain'}[0];
+		if ($ip_range) {
+			if (Rsyphon::HostRange::add_hosts_entries(
+				$ip_range, $domain_name, @all_hosts) < 0) {
+					print STDERR
+					      "ERROR: couldn't add entries " .
+					      "for group \"$name\" in " .
+					      "/etc/hosts\n";
+					return -1;
+			}
+            	}
+
+		# Cache all group informations in a simple text file.
+		foreach my $node (@all_hosts) {
+			unless ($groups->{$name}->{'override'}) {
+				# If no override is defined, simply print the image.
+				print OUT $node .
+					':' . $name .
+					':' . ($groups->{$name}->{'image'}[0] or '') .
+					":\n";
+				next;
+			}
+			# Print an entry for each override (reporting also the
+			# image in all the entries).
+			foreach (@{$groups->{$name}->{'override'}}) {
+				print OUT $node .
+					':' . $name .
+					':' . ($groups->{$name}->{'image'}[0] or '') .
+					':' . ($_) .
+					"\n";
+			}
+		}
+
+	}
+	close(OUT);
+
+	return 0;
+}
+
+# Usage: sync_etc_hosts($destination_file)
+# Description:
+#   Copy /etc/hosts to $destination_file if they differ.
+sub sync_etc_hosts
+{
+	my $dest = shift;
+
+	system "rsync -a /etc/hosts $dest";
+	if ($?) {
+		return -1;
+	}
+	return 0;
+}
+
+__END__
+
+=head1 NAME
+
+rsclusterconfig - Manage or show the Rsyphon cluster topology
+
+=head1 SYNOPSIS
+
+(show-mode): rsclusterconfig [OPTION]... hostname|host-range|host-group...
+
+(edit-mode): rsclusterconfig -e|-u [OPTION]...
+
+=head1 DESCRIPTION
+
+B<rsclusterconfig> is a tool to manage and show the group definitions of
+your cluster in the Rsyphon database.
+
+B<rsclusterconfig> can be used both to list (show-mode) or update (edit-mode)
+the node groups.
+
+In show-mode the command accepts as argument a list of hostnames, host-ranges
+and/or host-group, it resolves them in the equivalent list of hostnames and
+prints them to stdout.
+
+The edit-mode can be interactive (option -e) or batch (option -u).  In
+interactive edit-mode B<rsclusterconfig> opens an editor in your terminal that
+allows to modify the client group definitions and their properties using a XML
+syntax.  In batch edit-mode it only parses the pre-defined XML configuration and
+refresh the opportune Rsyphon internal configuration files.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--help | -h>
+
+Display a short help.
+
+=item B<--version | -v>
+
+Display version and copyright information.
+
+=item B<--update | -u>
+
+Force a non-interactive update of all the configuration files.
+
+=item B<--edit | -e>
+
+Edit the cluster topology configuration in interactive mode.
+
+=item B<--groups | -g>
+
+Show groups associations for each node (this option works only in show-mode).
+
+=item B<--image | -i>
+
+Show image associations for each node (this option works only in show-mode).
+
+=back
+
+=head1 SEE ALSO
+
+rsyphon(8), rspcp(8), rspsh(8), rspushoverrides(8),
+rsmkclientnetboot(8), rspushinstall(8), rsmkdhcpserver(8)
+
+=head1 AUTHOR
+
+Andrea Righi <a.righi@cineca.it>.
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2003 by Andrea Righi <a.righi@cineca.it>.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut

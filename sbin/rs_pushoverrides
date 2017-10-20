@@ -1,0 +1,389 @@
+#!/usr/bin/perl -w
+#
+#  Copyright (C) 2005 Andrea Righi <a.righi@cineca.it>
+#
+
+use lib "USR_PREFIX/lib/rsyphon/perl";
+use strict;
+use Getopt::Long;
+use File::Basename;
+use XML::Simple;
+use Rsyphon::Config;
+use Rsyphon::HostRange;
+use vars qw($config $VERSION);
+
+my $program_name = basename($0);
+
+my $VERSION = "SYSTEMIMAGER_VERSION_STRING";
+
+my $version_info = << "EOF";
+$program_name (part of Rsyphon) v$VERSION
+
+Copyright (C) 2006 Andrea Righi <a.righi\@cineca.it>
+
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+EOF
+
+my $help_info = $version_info . << "EOF";
+Usage: $program_name [OPTIONS] ... GROUP_NAME | NODE_NAME | NODE_RANGE ...
+
+Options:
+ --help, -h             Display this output.
+
+ --version, -V          Display version and copyright information.
+
+ --verbose, -v          Display verbose informations.
+
+ --dry-run, -d          Only show what would have been transferred
+                        without really distributing files.
+
+ --checksum, -c         Update only files with changed content. Mostly
+                        useful with -d to see which file will be altered
+                        because it's often slower than default.
+
+ --max, -m=NUM          Set the maximum number of concurrent copies
+                        to NUM (default=32).
+
+ --timeout, -t=NUM      Set the timeout of the sessions (default=15s).
+
+EOF
+
+Getopt::Long::Configure("posix_default");
+Getopt::Long::Configure("no_gnu_compat");
+Getopt::Long::Configure("bundling");
+
+GetOptions(
+	"help|h"	=> \my $help,
+	"version|V"	=> \my $version,
+	"verbose|v"	=> \my $verbose,
+	"dry-run|d"	=> \my $dry_run,
+	"checksum|c"	=> \my $checksum,
+	"max|m=i"	=> \my $concurrents,
+	"timeout|t=i"	=> \my $timeout,
+) or die($help_info);
+
+### BEGIN evaluate commad line options ###
+
+if ($help) {
+        print "$help_info";
+        exit(0);
+}
+
+if ($version) {
+        print "$version_info";
+        exit(0);
+}
+
+if ($verbose) {
+        $verbose = '-v';
+} else {
+        $verbose = '';
+}
+
+if ($dry_run) {
+        $dry_run = '-d';
+} else {
+	$dry_run = '';
+}
+
+if ($checksum) {
+        $checksum = '-c';
+} else {
+	$checksum = '';
+}
+
+if ($concurrents) {
+	$concurrents = "-m $concurrents";
+} else {
+	$concurrents = '';
+}
+
+if ($timeout) {
+	$timeout = "-t $timeout";
+} else {
+	$timeout = '';
+}
+
+# Parse arguments.
+unless (@ARGV) {
+	print $help_info;
+	exit(1);
+}
+
+### END evaluate command line options ###
+
+select(STDERR);
+$| = 1;
+select(STDOUT);
+$| = 1;
+
+my $database =  $Rsyphon::HostRange::database;
+my $overrides = $config->default_override_dir();
+unless ($overrides) {
+	die "FATAL: parameter DEFAULT_OVERRIDE_DIR is not defined in /etc/rsyphon/rsyphon.conf\n";
+}
+
+# Parse XML database.
+my $xml = XMLin($database, ForceArray => 1);
+
+my @global_overrides = @{$xml->{'override'}};
+unless (@global_overrides) {
+	die("ERROR: global override undefined in cluster.xml! See rsclusterconfig(8).\n");
+}
+
+# For each single node get the list of groups the node belongs to.
+print "Building clients list...\n" if ($verbose);
+# Cache hosts/groups associations in a single memory hash.
+my $all_nodes;
+foreach my $group (Rsyphon::HostRange::sort_group(@{($xml->{'group'})})) {
+	my $name = $group->{'name'}[0];
+	map { push(@{$all_nodes->{$_}}, $group) }
+		Rsyphon::HostRange::expand_groups_xml($xml, $name);
+}
+# Create a hash of groups per node for the entries passed by command line.
+my $single_nodes;
+foreach my $arg (Rsyphon::HostRange::expand_groups_xml($xml, join(' ', @ARGV))) {
+	if (defined($all_nodes->{$arg})) {
+		push(@{$single_nodes->{$arg}}, @{$all_nodes->{$arg}});
+	} else {
+		print STDERR "WARNING: \"$arg\" is not a valid group or node name! skipping it.\n";
+	}
+}
+
+
+# Group the nodes by the same list of overrides, in order to distribute these
+# overrides in parallel to the whole pool of nodes that need them.
+print "Grouping clients by common overrides...\n" if ($verbose);
+my $grouped_by_overrides;
+foreach my $node (keys %{$single_nodes}) {
+	my $group_list = '';
+
+	# Rsync uses a reverse order preference in case of file overlaps.
+	#
+	# If we need to copy different source file to the same destination file
+	# (overlap) it copies the first occurence only.
+	#
+	# Grouping overrides sorted in order of importance allows to correctly
+	# handle file overlaps between overrides at different hierarchical
+	# levels.
+	#
+	# The hierarchical levels are, in order of importance:
+	#    - hostname (overwrite group and all)
+	#    - group (overwrite all)
+	#    - global overrides
+	if (-d "$overrides/$node") {
+		$group_list .= "$overrides/$node/ ";
+	}
+	# If a node belongs to more groups, sort the groups alphabetically
+	# (this means that the most important is the first in alphabetical
+	# order).
+	my @groups = @{($single_nodes->{$node})};
+	if (($#groups > 0) && ($verbose)) {
+		print STDERR "WARNING: client \"$node\" belongs to many host groups: " .
+			     join(',', map {$_->{'name'}[0]} @groups) . "\n";
+		print STDERR "WARNING: in case of file overlaps the overrides " .
+			     "will be distributed using the following order " .
+			     "(first hit wins):\n";
+		print STDERR "WARNING: --> " .
+			     join(',', map { join(',', @{$_->{'override'}}) } @groups) . "\n";
+	}
+	foreach my $group (@groups) {
+		# Inside the same groups overrides are already sorted by
+		# importance, using the same sequential order as they appear
+		# inside the group definition. This means that first occurrence
+		# in the group is the most important, last occurrence is the
+		# least important.
+		foreach (@{$group->{'override'}}) {
+			my $override =  $overrides . '/' . $_;
+			if (-d $override) {
+				$group_list .= $override . '/ ';
+			}
+		}
+	}
+	# global overrides are the least important.
+	foreach (@global_overrides) {
+		if (-d  "$overrides/$_") {
+			$group_list .= "$overrides/$_/ ";
+		}
+	}
+
+	# Add the node to the override group.
+	push(@{$grouped_by_overrides->{$group_list}}, $node)
+}
+
+# Perform the updates (optimally).
+print "Performing the updates...\n" if ($verbose);
+foreach my $group (keys %{$grouped_by_overrides}) {
+	update_nodes($group, @{$grouped_by_overrides->{$group}});
+}
+
+exit(0);
+
+# Description:
+#  Wrapper to rspcp command to push files from the overrides to the
+#  target nodes.
+#
+# Usage:
+#  update_nodes($list_of_file_string, @list_of_nodes);
+#
+sub update_nodes
+{
+	my ($file_str, @nodes) = @_;
+
+	my $base_cmd = "rspcp $verbose $dry_run $checksum $concurrents $timeout";
+	@nodes = Rsyphon::HostRange::sort_unique(@nodes);
+
+	# Update nodes that needs the same overrides.
+	my $node_list = join(',', @nodes);
+	if ($file_str) {
+		run_cmd("$base_cmd -n $node_list $file_str /");
+	} else {
+		print STDERR "WARNING: no override found for $node_list! skipping them.\n";
+	}
+}
+
+# Description:
+#  Execute a command using system().
+#
+# Usage:
+#  run_cmd($command);
+#
+sub run_cmd
+{
+	my $cmd = shift;
+	print " >> $cmd\n" if($verbose);
+	!system($cmd) or print STDERR "ERROR: couldn't execute $cmd!\n";
+}
+
+__END__
+
+=head1 NAME
+
+rspushoverrides - push the overrides from the image server to the clients
+
+=head1 SYNOPSIS
+
+rspushoverrides [OPTIONS] ... GROUP_NAME | NODE_NAME ...
+
+=head1 DESCRIPTION
+
+B<rspushoverrides> is a tool to distribute configuration files from
+the image server to the clients or group of them, using the Rsyphon
+overrides.
+
+B<rspushoverrides> accepts a list of group or node names as arguments
+and concurrently synchronizes the content of the associated overrides to
+them, using a server-driven approach.
+
+The topology of the cluster can be defined in the cluster configuration by
+the command rsclusterconfig(8).
+
+B<rspushoverrides> transmits only the differences of the files to be
+distributed. It uses rsync over SSH based backend to exploit both the
+advantages of bandwidth optimization and security.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--help, -h>
+
+Display a short help.
+
+=item B<--version, -V>
+
+Display version and copyright information.
+
+=item B<--dry-run, -d>
+
+Only show what would have been transferred without really distributing files.
+
+=item B<--checksum | -c>
+
+Update only files with changed content (force checksum usage for all the 
+files on the sender). Receiver compares the checksums of each file (if 
+it exists and has the same size as the sender counterpart). Mostly 
+useful with -d to see which file will be altered because it's often slower 
+than default.
+
+=item B<--max, -m NUM>
+
+Set the maximum number of concurrent sessions to NUM (default=32).
+
+=item B<--timeout, -t NUM>
+
+Set the timeout of the sessions (default=15s).
+
+=head1 NOTES
+
+If a node belongs to more groups (defined by rsclusterconfig) sort the groups
+by name in alphabetical order to distribute the overrides. This means that in
+case of file overlaps the first hit wins: the node will receive the file that is
+in the first group.
+
+All the files that do not overlap will be distributed as a union of the groups.
+
+Example:
+
+B<group: Login   = node001,node002 (override Login)>
+
+B<group: Storage = node001,node003 (override RHEL4_Storage)>
+
+Suppose to have the following files into the overrides "Login" and
+"RH4_Storage":
+
+B</var/lib/rsyphon/overrides/Login/etc/hosts>
+
+B</var/lib/rsyphon/overrides/Login/etc/passwd>
+
+B</var/lib/rsyphon/overrides/Login/etc/group>
+
+B</var/lib/rsyphon/overrides/Login/etc/shadow>
+
+B</var/lib/rsyphon/overrides/RH4_Storage/etc/hosts>
+
+B</var/lib/rsyphon/overrides/RH4_Storage/etc/profile>
+
+During the overrides distribution (at the end of the imaging) node001 will
+receive the following files:
+
+B</var/lib/rsyphon/overrides/Login/etc/hosts> -E<gt> B</etc/hosts>
+
+B</var/lib/rsyphon/overrides/Login/etc/passwd> -E<gt> B</etc/passwd>
+
+B</var/lib/rsyphon/overrides/Login/etc/group> -E<gt> B</etc/group>
+
+B</var/lib/rsyphon/overrides/Login/etc/shadow> -E<gt> B</etc/shadow>
+
+B</var/lib/rsyphon/overrides/RH4_Storage/etc/hosts> (B<skipped!>)
+
+B</var/lib/rsyphon/overrides/RH4_Storage/etc/profile> -E<gt> B</etc/profile>
+
+=back
+
+=head1 SEE ALSO
+
+rsyphon(8), rspsh(8), rspcp(8), rsclusterconfig(8)
+
+=head1 AUTHOR
+
+Andrea Righi <a.righi@cineca.it>.
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2003 by Andrea Righi <a.righi@cineca.it>.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+=cut
+

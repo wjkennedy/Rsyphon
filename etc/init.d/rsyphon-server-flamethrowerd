@@ -1,0 +1,91 @@
+#!/bin/sh
+#
+# "Flamethrower"
+#
+#  Copyright (C) 2003 Bald Guy Software 
+#                     Brian E. Finley <brian@thefinleys.com>
+#
+#
+# Support for IRIX style chkconfig:
+# chkconfig:   35 20 20
+# description: The Flamethrower multicast daemon.
+#
+#
+# Support for LSB compliant init system:
+### BEGIN INIT INFO
+# Provides: rsyphon-server-flamethrowerd
+# Required-Start: $network $syslog
+# Required-Stop:
+# Default-Start:  3 5
+# Default-Stop:   0 1 2 6
+# Short-Description: Daemon for multicast file distribution
+# Description: Daemon for multicast file distribution
+### END INIT INFO
+
+kill_em_all() {
+    if [ -f $PPID_FILE ]; then
+        kill -9 `cat $PPID_FILE`
+        rm -f $PPID_FILE
+    fi
+    if [ "`ls $STATE_DIR`" != "" ]; then
+        for PID_FILE in `ls ${STATE_DIR}/*`
+        do
+            if [ -f $PID_FILE ]; then
+                kill -9 `cat $PID_FILE`
+                rm -f $PID_FILE
+                echo -n "."
+            fi
+        done
+        kill_em_all
+    fi
+}
+
+PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:
+PPID_FILE=/var/run/rsyphon-server-flamethrowerd.pid
+
+# STATE_DIR must match the setting in the flamethrower.conf file.
+STATE_DIR=/var/state/rsyphon/flamethrower
+
+case "$1" in
+  start)
+    if [ -e $PPID_FILE ]; then
+        echo "PID file $PPID_FILE exists.  Must be already running."
+        exit 1
+    fi
+    echo -n "Starting Flamethrower daemon: "
+    flamethrowerd --config-file /etc/rsyphon/flamethrower.conf --pid-file $PPID_FILE
+    if [ $? -eq 0 ]; then
+        echo "ok."
+    else
+        echo "failed."
+        exit 1
+    fi
+    ;;
+  stop)
+    echo -n "Stopping Flamethrower daemon: "
+    kill_em_all
+    if ps -p `cat $PPID_FILE 2>/dev/null` >/dev/null 2>&1; then
+        echo "failed."
+        exit 1
+    else
+        echo "ok."
+        exit 0
+    fi
+    ;;
+  status)
+    echo -n "Status of Flamethrower daemon: flamethrowerd... "
+    ([ -f $PPID_FILE ] && ps -p `cat $PPID_FILE` >/dev/null 2>&1 && echo "running." && exit 0) || (echo "not running." && exit 1)
+    ;;
+  reload)
+    echo "Not implemented."
+    ;;
+  force-reload|restart)
+    sh $0 stop
+    sh $0 start
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|status|restart}"
+    exit 1
+    ;;
+esac
+
