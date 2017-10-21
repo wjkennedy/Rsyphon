@@ -108,22 +108,21 @@ AC_ARG_ENABLE([lvm],
 AC_CHECK_PROG(found_docbook2man,[docbook2man],[yes])
 
 AC_ARG_ENABLE([docs],
-    [  --enable-docs           build sgml docs [default=yes if docbook2man is installed]],
-    [if test "x$enableval" = "xyes"; then
-        if test "x$found_docbook2man" = "xyes"; then
-            AC_SUBST(BUILD_DOCS,1)
-        else
-                RS_CHECK_FAIL(docbook2man,docbook-utils,http://net-snmp.sourceforge.net/,
-                You can't build Rsyphon documentation without docbook.  
-                You can build without docs by passing the --disable-docs flag)
-        fi
-    fi
-    ],
-    [if test "x$found_docbook2man" = "xyes"; then
-            AC_SUBST(BUILD_DOCS,1)
-     fi])
+#    [  --enable-docs           build sgml docs [default=yes if docbook2man is installed]],
+#    [if test "x$enableval" = "xyes"; then
+#        if test "x$found_docbook2man" = "xyes"; then
+#            AC_SUBST(BUILD_DOCS,1)
+#        else
+#                RS_CHECK_FAIL(docbook2man,docbook-utils,http://net-snmp.sourceforge.net/,
+#                You can't build Rsyphon documentation without docbook.  
+#                You can build without docs by passing the --disable-docs flag)
+#        fi
+#    fi
+#    ],
+#    [if test "x$found_docbook2man" = "xyes"; then
+#            AC_SUBST(BUILD_DOCS,1)
+#     fi])
 
-# for
 
 AC_CONFIG_FILES([config.inc])
 
