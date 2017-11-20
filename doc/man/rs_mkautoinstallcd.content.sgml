@@ -18,7 +18,7 @@
     &dhsection;
   </refmeta>
   <refnamediv>
-    <refname>rsmkautoinstallcd</refname>
+    <refname>rs_mkautoinstallcd</refname>
 
     <refpurpose>
       generate a bootable iso image for autoinstalling clients
@@ -26,7 +26,7 @@
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>rsmkautoinstallcd</command>
+      <command>rs_mkautoinstallcd</command>
       <arg><option>-help</option></arg>
       <arg><option>-version</option></arg>
       <arg><option>-arch <replaceable>ARCH</replaceable></option></arg>
@@ -42,9 +42,9 @@
     <title>DESCRIPTION</title>
 
     <para>This manual page documents briefly the
-      <command>rsmkautoinstallcd</command> command.</para>
+      <command>rs_mkautoinstallcd</command> command.</para>
 
-    <para><command>rsmkautoinstallcd</command> creates an iso image which can be
+    <para><command>rs_mkautoinstallcd</command> creates an iso image which can be
        used to boot an autoinstall client and initiate an autoinstall.
     </para>
 
@@ -71,7 +71,7 @@
 	  <para>
 	    Create a CD image for autoinstallclients of this architecture.
 	    Defaults to the architecture of the host on which
-	    <command>rsmkautoinstallcd</command> is being run.
+	    <command>rs_mkautoinstallcd</command> is being run.
 	  </para>
 	</listitem>
       </varlistentry>

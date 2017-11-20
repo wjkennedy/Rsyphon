@@ -18,7 +18,7 @@
     &dhsection;
   </refmeta>
   <refnamediv>
-    <refname>rsmkclientnetboot</refname>
+    <refname>rs_mkclientnetboot</refname>
 
     <refpurpose>
       set boot state for netboot enabled Rsyphon clients
@@ -26,7 +26,7 @@
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>rsmkclientnetboot</command>
+      <command>rs_mkclientnetboot</command>
 
       <arg><option>--help</option></arg>
       <arg><option>--version</option></arg>
@@ -43,9 +43,9 @@
     <title>DESCRIPTION</title>
 
     <para>This manual page documents briefly the
-      <command>rsmkclientnetboot</command> command.</para>
+      <command>rs_mkclientnetboot</command> command.</para>
 
-    <para><command>rsmkclientnetboot</command> set the boot state of the
+    <para><command>rs_mkclientnetboot</command> set the boot state of the
     netboot-enabled clients on a image server.</para>
 
   </refsect1>
@@ -135,7 +135,7 @@
   <refsect1>
     <title>SEE ALSO</title>
 
-    <para><command>rsgetimage</command>(8)</para>
+    <para><command>rs_getimage</command>(8)</para>
 
     <para>More details can be found in the <citetitle>Rsyphon
 	manual.</citetitle>

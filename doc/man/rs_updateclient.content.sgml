@@ -18,7 +18,7 @@
     &dhsection;
   </refmeta>
   <refnamediv>
-    <refname>rsupdateclient</refname>
+    <refname>rs_updateclient</refname>
 
     <refpurpose>
       update the image running on the local client machine to match that of an
@@ -27,7 +27,7 @@
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>rsupdateclient</command>
+      <command>rs_updateclient</command>
 
       <arg><option>--help</option></arg>
       <arg><option>--version</option></arg>
@@ -50,12 +50,12 @@
     <title>DESCRIPTION</title>
 
     <para>
-      This manual page documents briefly the <command>rsupdateclient</command>
+      This manual page documents briefly the <command>rs_updateclient</command>
       command.
     </para>
 
     <para>
-      <command>rsupdateclient</command> is a program that brings the local
+      <command>rs_updateclient</command> is a program that brings the local
       client's image up to date with an image on a image server.
     </para>
 
@@ -133,7 +133,7 @@
         <listitem>
           <para>
 	    Don't run the bootloader (lilo, elilo, grub, etc) after update
-	    completes.  (<command>rsupdateclient</command> always runs the
+	    completes.  (<command>rs_updateclient</command> always runs the
 	    bootloader unless specified).
 	  </para>
         </listitem>
@@ -237,7 +237,7 @@
 
     <para>
       <command>rspushupdate</command>(8),
-      <command>rslsimage</command>(8),
+      <command>rs_lsimage</command>(8),
       <command>rsclusterconfig</command>(8),
       <command>rspushoverrides</command>(8)
     </para>

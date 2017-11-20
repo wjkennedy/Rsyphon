@@ -81,8 +81,8 @@
     <title>SEE ALSO</title>
 
     <para>
-      <command>rslsimage</command>(8), <command>rscpimage</command>(8),
-      <command>rsmvimage</command>(8)
+      <command>rs_lsimage</command>(8), <command>rs_cpimage</command>(8),
+      <command>rs_mvimage</command>(8)
     </para>
 
     <para>More details can be found in the <citetitle>Rsyphon

@@ -18,13 +18,13 @@
     &dhsection;
   </refmeta>
   <refnamediv>
-    <refname>rsmkbootpackage</refname>
+    <refname>rs_mkbootpackage</refname>
 
     <refpurpose>prepare a boot package (kernel + initrd.img) that can be used to autoinstall clients</refpurpose>
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>rsmkbootpackage</command>
+      <command>rs_mkbootpackage</command>
 
       <arg choice=req><option>--destination</option> <replaceable>DIR</replaceable> | <option>--flavor</option> <replaceable>FLAVOR</replaceable></arg>
       <arg><option>--version</option></arg>
@@ -47,10 +47,10 @@
     <title>DESCRIPTION</title>
 
     <para>This manual page documents briefly the
-      <command>rsmkbootpackage</command> command.</para>
+      <command>rs_mkbootpackage</command> command.</para>
 
     <para>
-      <command>rsmkbootpackage</command> is a program that takes
+      <command>rs_mkbootpackage</command> is a program that takes
       the kernel specified, and necessary modules from it, and creates
       a new boot package based on said kernel.  The resultant files include
       a matched kernel and initrd.img that can be used as the Rsyphon
@@ -241,7 +241,7 @@
   <refsect1>
     <title>SEE ALSO</title>
 
-    <para><command>rsprepareclient</command>(8)</para>
+    <para><command>rs_prepareclient</command>(8)</para>
 
     <para>More details can be found in the <citetitle>Rsyphon
 	manual.</citetitle>

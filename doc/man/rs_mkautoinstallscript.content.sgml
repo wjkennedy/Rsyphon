@@ -18,7 +18,7 @@
     &dhsection;
   </refmeta>
   <refnamediv>
-    <refname>rsmkautoinstallscript</refname>
+    <refname>rs_mkautoinstallscript</refname>
 
     <refpurpose>
         create a Rsyphon autoinstallscript
@@ -26,7 +26,7 @@
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>rsmkautoinstallscript</command>
+      <command>rs_mkautoinstallscript</command>
       <arg><option>--help</option></arg>
       <arg><option>--version</option></arg>
       <arg><option>--quiet</option></arg>
@@ -45,9 +45,9 @@
     <title>DESCRIPTION</title>
 
     <para>This manual page documents briefly the
-      <command>rsmkautoinstallscript</command> command.</para>
+      <command>rs_mkautoinstallscript</command> command.</para>
 
-    <para><command>rsmkautoinstallscript</command> creates an autoinstallscript
+    <para><command>rs_mkautoinstallscript</command> creates an autoinstallscript
       for a Rsyphon image.
     </para>
 
@@ -161,7 +161,7 @@
 		  name.  It is possible therefore, when using static dhcp, to
 		  change a machine's hostname and IP address by simply changing
 		  one value in the dhcpd.conf file.  Some may find this
-		  desirable.  Also see the <command>rsmkdhcpstatic</command>
+		  desirable.  Also see the <command>rs_mkdhcpstatic</command>
 		  command.
 		</para>
 	      </listitem>
@@ -239,7 +239,7 @@
     <title>SEE ALSO</title>
 
     <para>
-      <command>rsgetimage</command>(8),
+      <command>rs_getimage</command>(8),
       <command>rsautoinstallscript.conf</command>(5)
     </para>
 

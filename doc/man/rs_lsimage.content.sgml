@@ -18,13 +18,13 @@
     &dhsection;
   </refmeta>
   <refnamediv>
-    <refname>rslsimage</refname>
+    <refname>rs_lsimage</refname>
 
     <refpurpose>list the images on an image server</refpurpose>
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>rslsimage</command>
+      <command>rs_lsimage</command>
 
       <arg><option>-help</option></arg>
       <arg><option>-version</option></arg>
@@ -37,9 +37,9 @@
     <title>DESCRIPTION</title>
 
     <para>This manual page documents briefly the
-      <command>rslsimage</command> command.</para>
+      <command>rs_lsimage</command> command.</para>
 
-    <para><command>rslsimage</command> lists the available images on a
+    <para><command>rs_lsimage</command> lists the available images on a
       given image server.</para>
 
   </refsect1>
@@ -81,7 +81,7 @@
   <refsect1>
     <title>SEE ALSO</title>
 
-    <para><command>rsgetimage</command>(8)</para>
+    <para><command>rs_getimage</command>(8)</para>
 
     <para>More details can be found in the <citetitle>Rsyphon
 	manual.</citetitle>

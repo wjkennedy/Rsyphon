@@ -18,7 +18,7 @@
     &dhsection;
   </refmeta>
   <refnamediv>
-    <refname>rsmkdhcpstatic</refname>
+    <refname>rs_mkdhcpstatic</refname>
 
     <refpurpose>
       create a DHCP server configuration file with static entries
@@ -26,22 +26,22 @@
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>rsmkdhcpstatic</command>
+      <command>rs_mkdhcpstatic</command>
     </cmdsynopsis>
   </refsynopsisdiv>
   <refsect1>
     <title>DESCRIPTION</title>
 
     <para>This manual page documents briefly the
-      <command>rsmkdhcpstatic</command> command.</para>
+      <command>rs_mkdhcpstatic</command> command.</para>
 
     <para>
-      <command>rsmkdhcpstatic</command> is a utility for generating a 
+      <command>rs_mkdhcpstatic</command> is a utility for generating a 
       a dhcpd configuration file for use with Rsyphon.  Static entries
       are created for IP addresses that are currently dynamically leased.
       This utility should be used after autoinstalling clients with an image
       that uses the dhcp_static method.  This method is assigned to the image
-      by <command>rsgetimage</command>.
+      by <command>rs_getimage</command>.
     </para>
 
   </refsect1>
@@ -49,7 +49,7 @@
     <title>OPTIONS</title>
 
     <para>
-      <command>rsmkdhcpstatic</command> currently accepts to options.
+      <command>rs_mkdhcpstatic</command> currently accepts to options.
     </para>
 
   </refsect1>
@@ -57,7 +57,7 @@
     <title>SEE ALSO</title>
 
     <para>
-      <command>rsmkdhcpserver(8)</command>, <command>rsgetimage</command>(8)
+      <command>rs_mkdhcpserver(8)</command>, <command>rs_getimage</command>(8)
     </para>
 
     <para>More details can be found in the <citetitle>Rsyphon

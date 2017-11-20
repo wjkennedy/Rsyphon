@@ -18,7 +18,7 @@
     &dhsection;
   </refmeta>
   <refnamediv>
-    <refname>rsmkbootserver</refname>
+    <refname>rs_mkbootserver</refname>
 
     <refpurpose>
       Configure a server so that other machines can boot from it over the
@@ -27,7 +27,7 @@
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>rsmkbootserver</command>
+      <command>rs_mkbootserver</command>
 
       <arg><option>-f</option></arg>
       <arg><option>--interface=<replaceable>INTERFACE</replaceable></option></arg>
@@ -39,10 +39,10 @@
     <title>DESCRIPTION</title>
 
     <para>This manual page documents briefly the
-      <command>rsmkbootserver</command> command.</para>
+      <command>rs_mkbootserver</command> command.</para>
 
     <para>
-      <command>rsmkbootserver</command> is a tool that assists in configuring
+      <command>rs_mkbootserver</command> is a tool that assists in configuring
       a network boot server (currently just PXE servers).  It runs in both
       interactive and non-interactive modes.
     </para>
@@ -93,8 +93,8 @@
     <title>SEE ALSO</title>
 
     <para>
-      <command>rsmkdhcpserver</command>(8),
-      <command>rsmkdhcpstatic</command>(8)
+      <command>rs_mkdhcpserver</command>(8),
+      <command>rs_mkdhcpstatic</command>(8)
     </para>
 
     <para>More details can be found in the <citetitle>Rsyphon

@@ -449,7 +449,7 @@
     <title>SEE ALSO</title>
 
     <para>
-      <command>rsmkautoinstallscript</command>(8), <filename>fstab(5)</filename>
+      <command>rs_mkautoinstallscript</command>(8), <filename>fstab(5)</filename>
     </para>
 
     <para>

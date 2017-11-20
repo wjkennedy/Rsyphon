@@ -7,24 +7,24 @@
     &dhsurname;
   </author>
   <copyright>
-    <year>2002</year>
+    <year>2017</year>
     <holder>&dhusername;</holder>
   </copyright>
   &dhdate;
   </refentryinfo>
   <refmeta>
-  <refentrytitle>RS_ADDCLIENTS</refentrytitle>
+  <refentrytitle>rs_addclients</refentrytitle>
   
   &dhsection;
   </refmeta>
   <refnamediv>
-  <refname>rsaddclients</refname>
+  <refname>rs_addclients</refname>
   
   <refpurpose>assign clients to an image</refpurpose>
   </refnamediv>
   <refsynopsisdiv>
   <cmdsynopsis>
-    <command>rsaddclients</command>
+    <command>rs_addclients</command>
     <arg><option>-help</option></arg>
     <arg><option>-version</option></arg>
     <arg><option>-hosts <replaceable>HOST_LIST</replaceable></option></arg>
@@ -39,13 +39,13 @@
   <title>DESCRIPTION</title>
 
   <para>
-    This manual page documents briefly the <command>rsaddclients</command>
+    This manual page documents briefly the <command>rs_addclients</command>
     command.
   </para>
 
   <para>
-    <command>rsaddclients</command> is a tool for mapping clients to a
-    Rsyphon image.  There are three sections to the rsaddclients
+    <command>rs_addclients</command> is a tool for mapping clients to a
+    Rsyphon image.  There are three sections to the rs_addclients
     utility:
   </para>
   <orderedlist>
@@ -100,7 +100,7 @@
 
   <para>
     A summary of options is included below.  By default, if an insufficient 
-    set of options is specified, <command>rsaddclients</command> will fall back 
+    set of options is specified, <command>rs_addclients</command> will fall back 
     to an interactive mode.  See <option>-interactive</option> below if you
     wish to alter this behavior.
   </para>
@@ -205,8 +205,8 @@
     <title>SEE ALSO</title>
 
     <para>
-      <command>rsgetimage</command>(8), <command>rsmkdhcpserver</command>(8),
-      <command>rsmkdhcpstatic</command>(8), <command>rsclusterconfig</command>(8)
+      <command>rs_getimage</command>(8), <command>rs_mkdhcpserver</command>(8),
+      <command>rs_mkdhcpstatic</command>(8), <command>rs_clusterconfig</command>(8)
     </para>
 
     <para>More details can be found in the <citetitle>Rsyphon

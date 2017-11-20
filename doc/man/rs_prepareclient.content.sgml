@@ -18,13 +18,13 @@
     &dhsection;
   </refmeta>
   <refnamediv>
-    <refname>rsprepareclient</refname>
+    <refname>rs_prepareclient</refname>
 
     <refpurpose>prepare a golden client's image for retrieval</refpurpose>
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>rsprepareclient</command>
+      <command>rs_prepareclient</command>
 
       <arg choice=req><option>--server</option> <replaceable>HOSTNAME</replaceable></arg>
       <arg><option>--version</option></arg>
@@ -50,9 +50,9 @@
     <title>DESCRIPTION</title>
 
     <para>This manual page documents briefly the
-      <command>rsprepareclient</command> command.</para>
+      <command>rs_prepareclient</command> command.</para>
 
-    <para><command>rsprepareclient</command> is a program that prepares
+    <para><command>rs_prepareclient</command> is a program that prepares
       a golden client's image for extracting by an image server.</para>
 
   </refsect1>
@@ -271,8 +271,8 @@
   <refsect1>
     <title>SEE ALSO</title>
 
-    <para><command>rsupdateclient</command>(8)</para>
-    <para><command>rsmkbootpackage</command>(8)</para>
+    <para><command>rs_updateclient</command>(8)</para>
+    <para><command>rs_mkbootpackage</command>(8)</para>
 
     <para>More details can be found in the <citetitle>Rsyphon
 	manual.</citetitle>

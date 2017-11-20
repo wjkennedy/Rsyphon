@@ -1,15 +1,15 @@
 <!doctype refentry PUBLIC "-//OASIS//DTD DocBook V4.1//EN" [
-  <!ENTITY content SYSTEM "rsaddclients.content.sgml">
+  <!ENTITY content SYSTEM "rs_addclients.content.sgml">
   <!-- Fill in your name for FIRSTNAME and SURNAME. -->
-  <!ENTITY dhfirstname "<firstname>dann</firstname>">
-  <!ENTITY dhsurname   "<surname>frazier</surname>">
+  <!ENTITY dhfirstname "<firstname>william</firstname>">
+  <!ENTITY dhsurname   "<surname>kennedy</surname>">
   <!-- Please adjust the date whenever revising the manpage. -->
-  <!ENTITY dhdate      "<date>December  8, 2002</date>">
+  <!ENTITY dhdate      "<date>November 19, 2017</date>">
   <!-- SECTION should be 1-8, maybe w/ subsection other parameters are
        allowed: see man(7), man(1). -->
   <!ENTITY dhsection   "<manvolnum>8</manvolnum>">
-  <!ENTITY dhemail     "<email>dannf@debian.org</email>">
-  <!ENTITY dhusername  "dann">
+  <!ENTITY dhemail     "<email>william@a9group.net</email>">
+  <!ENTITY dhusername  "wjkennedy">
 
   <!ENTITY debian      "<productname>Debian GNU/Linux</productname>">
   <!ENTITY gnu         "<acronym>GNU</acronym>">

@@ -18,13 +18,13 @@
     &dhsection;
   </refmeta>
   <refnamediv>
-    <refname>rscpimage</refname>
+    <refname>rs_cpimage</refname>
 
     <refpurpose>make a copy of a Rsyphon image.</refpurpose>
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>rscpimage</command>
+      <command>rs_cpimage</command>
 
       <arg><option>-help</option></arg>
       <arg><option>-version</option></arg>
@@ -41,10 +41,10 @@
     <title>DESCRIPTION</title>
 
     <para>This manual page documents briefly the
-      <command>rscpimage</command> command.</para>
+      <command>rs_cpimage</command> command.</para>
 
     <para>
-      <command>rscpimage</command> makes a copy of a Rsyphon image.
+      <command>rs_cpimage</command> makes a copy of a Rsyphon image.
     </para>
 
   </refsect1>
@@ -113,7 +113,7 @@
     <title>SEE ALSO</title>
 
     <para>
-      <command>rslsimage</command>(8), <command>rsmvimage</command>(8),
+      <command>rs_lsimage</command>(8), <command>rs_mvimage</command>(8),
       <command>rsrmimage</command>(8)
     </para>
 

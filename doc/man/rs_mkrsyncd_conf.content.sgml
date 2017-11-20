@@ -18,19 +18,19 @@
     &mansection;
   </refmeta>
   <refnamediv>
-    <refname>rsmkrsyncd_conf</refname>
+    <refname>rs_mkrsyncd_conf</refname>
 
     <refpurpose>generates rsyncd.conf from a rsync stub directory</refpurpose>
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>rsmkrsyncd_conf </command>
+      <command>rs_mkrsyncd_conf </command>
     </cmdsynopsis>
   </refsynopsisdiv>
   <refsect1>
     <title>DESCRIPTION</title>
 
-    <para><command>rsmkrsyncd_conf</command> is a utility for generating a
+    <para><command>rs_mkrsyncd_conf</command> is a utility for generating a
       rsyncd.conf file for Rsyphon from an rsync stub directory.  The
       location of the rsync stub directory and the rsyncd.conf file are
       specified in <filename>/etc/rsyphon/rsyphon.conf</filename>

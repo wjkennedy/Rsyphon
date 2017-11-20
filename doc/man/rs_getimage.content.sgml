@@ -18,13 +18,13 @@
     &dhsection;
   </refmeta>
   <refnamediv>
-    <refname>rsgetimage</refname>
+    <refname>rs_getimage</refname>
 
     <refpurpose>pull an image from a golden client</refpurpose>
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>rsgetimage</command>
+      <command>rs_getimage</command>
 
     <arg rep=repeat><option>OPTION</option></arg>
     <arg choice=req><option>-golden-client</option> <replaceable>HOSTNAME</replaceable></arg> 
@@ -35,10 +35,10 @@
     <title>DESCRIPTION</title>
 
     <para>This manual page documents briefly the
-      <command>rsgetimage</command> command.</para>
+      <command>rs_getimage</command> command.</para>
 
     <para>
-      <command>rsgetimage</command> is a program that pulls an image
+      <command>rs_getimage</command> is a program that pulls an image
       to the image server.  The source for this image can be either a
       golden client or an image stored on another image server
     </para>
@@ -202,7 +202,7 @@
 		  name.  It is possible therefore, when using static dhcp, to
 		  change a machine's hostname and IP address by simply changing
 		  one value in the dhcpd.conf file.  Some may find this
-		  desirable.  Also see the <command>rsmkdhcpstatic</command>
+		  desirable.  Also see the <command>rs_mkdhcpstatic</command>
 		  command.
 		</para>
 	      </listitem>
@@ -280,10 +280,10 @@
     <title>SEE ALSO</title>
 
     <para>
-      <command>rsaddclients</command>(8),
+      <command>rs_addclients</command>(8),
       <command>rsclusterconfig</command>(8),
-      <command>rsmkdhcpserver</command>(8),
-      <command>rsmkdhcpstatic</command>(8),
+      <command>rs_mkdhcpserver</command>(8),
+      <command>rs_mkdhcpstatic</command>(8),
     </para>
 
     <para>More details can be found in the <citetitle>Rsyphon

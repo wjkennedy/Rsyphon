@@ -18,13 +18,13 @@
     &dhsection;
   </refmeta>
   <refnamediv>
-    <refname>rsmvimage</refname>
+    <refname>rs_mvimage</refname>
 
     <refpurpose>Move a Rsyphon image.</refpurpose>
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>rsmvimage</command>
+      <command>rs_mvimage</command>
 
       <arg><option>-help</option></arg>
       <arg><option>-version</option></arg>
@@ -39,10 +39,10 @@
     <title>DESCRIPTION</title>
 
     <para>This manual page documents briefly the
-      <command>rsmvimage</command> command.</para>
+      <command>rs_mvimage</command> command.</para>
 
     <para>
-      <command>rsmvimage</command> moves a Rsyphon image.
+      <command>rs_mvimage</command> moves a Rsyphon image.
     </para>
 
   </refsect1>
@@ -93,7 +93,7 @@
     <title>SEE ALSO</title>
 
     <para>
-      <command>rslsimage</command>(8), <command>rscpimage</command>(8),
+      <command>rs_lsimage</command>(8), <command>rs_cpimage</command>(8),
       <command>rsrmimage</command>(8)
     </para>
 

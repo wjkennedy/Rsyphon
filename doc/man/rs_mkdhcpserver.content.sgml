@@ -18,7 +18,7 @@
     &dhsection;
   </refmeta>
   <refnamediv>
-    <refname>rsmkdhcpserver</refname>
+    <refname>rs_mkdhcpserver</refname>
 
     <refpurpose>
       create a DHCP server configuration file for use with Rsyphon
@@ -26,24 +26,24 @@
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>rsmkdhcpserver</command>
+      <command>rs_mkdhcpserver</command>
     </cmdsynopsis>
   </refsynopsisdiv>
   <refsect1>
     <title>DESCRIPTION</title>
 
     <para>This manual page documents briefly the
-      <command>rsmkdhcpserver</command> command.</para>
+      <command>rs_mkdhcpserver</command> command.</para>
 
     <para>
-      <command>rsmkdhcpserver</command> is an interactive utility for creating
+      <command>rs_mkdhcpserver</command> is an interactive utility for creating
       a dhcpd configuration file for use with Rsyphon.  It generates
       entries commonly needed in PXE configurations, and defines option-100.
       option-100 is passed to autoinstall clients in order to direct them to
       the image server they should use.
     </para>
     <para>
-     The PXE configuration that rsmkdhcpserver creates will work for most
+     The PXE configuration that rs_mkdhcpserver creates will work for most
      i386 clients, but will not work for machines of other architectures.
      Please see the Rsyphon manual for instructions on configuring
      network boot for other supported architectures.
@@ -54,7 +54,7 @@
     <title>OPTIONS</title>
 
     <para>
-      <command>rsmkdhcpserver</command> currently accepts no options.
+      <command>rs_mkdhcpserver</command> currently accepts no options.
     </para>
 
   </refsect1>
@@ -62,7 +62,7 @@
   <refsect1>
     <title>SEE ALSO</title>
 
-    <para><command>rsmkdhcpstatic(8)</command></para>
+    <para><command>rs_mkdhcpstatic(8)</command></para>
     
     <para>More details can be found in the <citetitle>Rsyphon
 	manual.</citetitle>
