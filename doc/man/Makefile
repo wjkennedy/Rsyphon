@@ -11,19 +11,19 @@ SYSTEMIMAGER_VERSION = $(shell cat ../../VERSION)
 
 MANPAGES = $(SERVER_MAN) $(SERVER_POD_MAN) $(CLIENT_MAN) $(COMMON_MAN)
 
-SERVER_MAN = rs_addclients.8 				\
-			rs_getimage.8					\
-			rs_mkautoinstallcd.8			\
-			rs_mkautoinstallscript.8		\
-			rs_mkdhcpserver.8				\
-			rs_mkdhcpstatic.8				\
-			rs_cpimage.8					\
-			rs_mvimage.8					\
-			rs_rmimage.8					\
-			rs_mkbootserver.8				\
-			rs_yphon.conf.5			\
-			rs_yphon-rs_yncd.conf.5	\
-			rs_mkrs_yncd_conf.8				\
+SERVER_MAN = rs_addclients.8\
+			rs_getimage.8\
+			rs_mkautoinstallcd.8\
+			rs_mkautoinstallscript.8\
+			rs_mkdhcpserver.8\
+			rs_mkdhcpstatic.8\
+			rs_cpimage.8\
+			rs_mvimage.8\
+			rs_rmimage.8\
+			rs_mkbootserver.8\
+			rsyphon.conf.5\
+			rsyphon-rsyncd.conf.5\
+			rs_mkrsyncd_conf.8				\
 			rs_mkclientnetboot.8				\
 			rs_mkbootpackage.8		\
 			rs_installbtimage.8		\
@@ -49,10 +49,10 @@ all:	compress
 %.gz:	%
 	gzip -9 < $< > $@
 
-rs_yphon.conf.5:	rs_yphon.conf.pod
+rsyphon.conf.5:	rsyphon.conf.pod
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 5 -c "Rsyphon" $< $@
 
-rs_yphon-rs_yncd.conf.5:	rs_yphon-rs_yncd.conf.pod
+rsyphon-rsyncd.conf.5:	rsyphon-rsyncd.conf.pod
 	pod2man --release=$(SYSTEMIMAGER_VERSION) -s 5 -c "Rsyphon" $< $@
 
 rs_installbtimage.8: $(TOPDIR)/sbin/rs_installbtimage
