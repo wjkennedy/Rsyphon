@@ -1,13 +1,9 @@
 #
-# $Id$
-#  vi: set filetype=make:
 #
-
-LSB_VERSION      = 3.0
-LSB_DIFF_VERSION = 1ubuntu8
+LSB_VERSION      = 4.0
+LSB_DIFF_VERSION = 0ubuntu20
 LSB_TARBALL      = lsb_$(LSB_VERSION)-$(LSB_DIFF_VERSION).tar.gz
-# LSB_URL          = http://us.archive.ubuntu.com/ubuntu/pool/main/l/lsb/
-LSB_URL          = http://os.a9group.net/pub/lsb/
+LSB_URL          = http://os.a9group.net/pub/
 LSB_DIR          = $(INITRD_SRC_DIR)/lsb-$(LSB_VERSION)
 LSB_PATCHES 	 = $(shell ls $(INITRD_PATCH_DIR)/lsb.*.patch 2>/dev/null | sort)
 
