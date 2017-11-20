@@ -1,14 +1,4 @@
 #
-#	"Rsyphon"
-#
-#   $Id: initrd.rul 4573 2012-12-18 12:42:42Z olahaye74 $
-#    vi: set filetype=make:
-#
-#	Copyright (C) 1999-2011 Brian Elliott Finley
-#	Copyright (C) 2002-2004 dann frazier <dannf@hp.com>
-#
-#	Others who have contributed to this code:
-#		Sean Dague <sean@dague.net>
 #
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -62,9 +52,6 @@ MKCRAMFS = $(shell which mkcramfs || which mkfs.cramfs || \
 include $(INITRD_DIR)/make.d/e2fsprogs.rul
 include $(INITRD_DIR)/make.d/dosfstools.rul
 include $(INITRD_DIR)/make.d/hfsutils.rul
-include $(INITRD_DIR)/make.d/jfsutils.rul
-include $(INITRD_DIR)/make.d/reiserfsprogs.rul
-include $(INITRD_DIR)/make.d/xfsprogs.rul
 include $(INITRD_DIR)/make.d/lvm.rul
 include $(INITRD_DIR)/make.d/bc.rul
 include $(INITRD_DIR)/make.d/cx_freeze.rul
