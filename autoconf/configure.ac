@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(Rsyphon, 0.1.6, william@a9group.net)
+AC_INIT(Rsyphon, 0.1.7, william@a9group.net)
 AC_CONFIG_AUX_DIR(autoconf)
 #AC_CONFIG_SRCDIR([src/bc-1.06/acconfig.h])
 #AC_CONFIG_HEADER([config.h])

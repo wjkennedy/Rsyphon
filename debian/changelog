@@ -1,3 +1,9 @@
+rsyphon (0.1.7) UNRELEASED; urgency=medium
+
+  * Docs, updates, new codebases for BOEL (To become Rsys)
+
+ -- william <william@a9group.net>  Mon Nov 20 11:03:40 PST 2017
+
 rsyphon (0.1.6) UNRELEASED; urgency=medium
 
   * Initial release.
