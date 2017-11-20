@@ -1,9 +1,4 @@
-#!/bin/sh
-
-#
-# $Id$
-#
-#   Created by Dann Frazier (I think) -BEF-
+#!/bin/bash
 #
 
 wget_opts="--passive-ftp"
@@ -37,12 +32,12 @@ done
 tarball=$(basename $url)
 
 if [ -e "$dest/$tarball" ]; then
-    echo "$program: Warning: $dest/$tarball already exists - doing nothing."
+    echo "$program: Warning: $dest/$tarball already exists..."
     exit 0
 fi
 
 if [ ! -d $dest ]; then
-    echo "$program: Error: $dest does not exist or is not a directory"
+    echo "$program: Error: $dest does not exist or is not a directory."
     usage
     exit 1
 fi
@@ -79,9 +74,9 @@ fi
 ## END look for already extracted directories
 	    
 echo "$program: Can't find a local copy of $tarball."  
-echo "$program: I will try to fetch it from a well known site.  Please copy this"
+echo "$program: I will try to fetch it from the sites defined in the Make dules file.  Please copy this"
 echo "$program: tarball to one of the following locations to prevent downloading"
-echo "$program: the source again and sucking up unnecessary bandwidth:"
+echo "$program: the source again:"
 
 for dir in $(echo $search_path); do
   echo "    $dir"
