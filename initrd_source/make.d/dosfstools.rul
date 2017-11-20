@@ -1,6 +1,4 @@
 #
-# 	$Id$
-#    vi:set filetype=make:
 #
 
 DOSFSTOOLS_VERSION  = 2.11

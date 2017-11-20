@@ -1,7 +1,6 @@
 ZLIB_VERSION	= 1.2.5
 ZLIB_TARBALL 	= zlib-$(ZLIB_VERSION).tar.gz
-#ZLIB_URL    = http://www.zlib.net/$(ZLIB_TARBALL)
-ZLIB_URL 		= http://os.a9group.net/pub/zlib/$(ZLIB_TARBALL)
+ZLIB_URL 		= http://os.a9group.net/pub/$(ZLIB_TARBALL)
 ZLIB_DIR 		= $(INITRD_SRC_DIR)/zlib-$(ZLIB_VERSION)
 ZLIB_PATCHES 	= $(shell ls $(INITRD_PATCH_DIR)/zlib.*.patch 2>/dev/null | sort)
 

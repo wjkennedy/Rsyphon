@@ -1,25 +1,9 @@
 #
-#	$Id$
-#    vi: set filetype=make:
-#
-#	2007-02-10 Bernard Li
-#	- LVM 2.2.02.18 provides --with-dmdir in ./configure script
-#	2005-01-12 Andrea Righi
-#   	- provided patch for lvm support
-#	2005.07.12 Brian Elliott Finley; patch from Erich Focht
-#	- updates devmapper to 1.01.02
-#	- creates the symbolic link libdevmapper.so.1.01 which is required when
-#	  running mklibs (for tmp/boel_binaries/lib*). Without this patch the build
-#	  fails except one builds on a system where libdevmapper of the same version
-#	  is installed. But this is not why we build devmapper, after all...
-#       2013.01.11 Olivier Lahaye
-#       - upgrade to 2.2.02.98
 #
 
 LVM_VERSION		= 2.2.02.98
 LVM_TARBALL		= LVM$(LVM_VERSION).tgz
-LVM_URL			= ftp://sources.redhat.com/pub/lvm2/$(LVM_TARBALL)
-#LVM_URL 		= http://os.a9group.net/pub/lvm/$(LVM_TARBALL)
+LVM_URL 		= http://os.a9group.net/pub/lvm/$(LVM_TARBALL)
 LVM_DIR 		= $(INITRD_SRC_DIR)/LVM$(LVM_VERSION)
 LVM_PATCHES 	= $(shell ls $(INITRD_PATCH_DIR)/lvm.*.patch 2>/dev/null | sort)
 

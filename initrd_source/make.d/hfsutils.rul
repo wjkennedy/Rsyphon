@@ -1,13 +1,8 @@
 #
-#	$Id$
-# 	/* vi: set noet ts=8: */
-#
-# 	http://www.mars.org/home/rob/proj/hfs/
 #
 
 HFSUTILS_VERSION	:= 3.2.6
 HFSUTILS_TARBALL 	:= hfsutils-$(HFSUTILS_VERSION).tar.gz
-#HFSUTILS_URL 		:= ftp://ftp.mars.org/pub/hfs/$(HFSUTILS_TARBALL)
 HFSUTILS_URL 		:= http://os.a9group.net/pub/$(HFSUTILS_TARBALL)
 HFSUTILS_DIR 		= $(INITRD_SRC_DIR)/hfsutils-$(HFSUTILS_VERSION)
 HFSUTILS_PATCHES 	= $(shell ls $(INITRD_PATCH_DIR)/hfsutils.*.patch 2>/dev/null | sort)

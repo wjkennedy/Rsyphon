@@ -1,12 +1,9 @@
 #
-# $Id$
-#  vi: set filetype=make:
 #
 
 KEXEC_TOOLS_VERSION		= 2.0.3
 KEXEC_TOOLS_TARBALL 	= kexec-tools-$(KEXEC_TOOLS_VERSION).tar.xz
-#KEXEC_TOOLS_URL		 = http://www.kernel.org/pub/linux/kernel/people/horms/kexec-tools/
-KEXEC_TOOLS_URL 		= http://os.a9group.net/pub/kexec-tools/$(KEXEC_TOOLS_TARBALL)
+KEXEC_TOOLS_URL 		= http://os.a9group.net/pub/$(KEXEC_TOOLS_TARBALL)
 KEXEC_TOOLS_DIR 		= $(INITRD_SRC_DIR)/kexec-tools-$(KEXEC_TOOLS_VERSION)
 KEXEC_TOOLS_PATCHES 	= $(shell ls $(INITRD_PATCH_DIR)/kexec-tools.*.patch 2>/dev/null | sort)
 

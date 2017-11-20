@@ -1,11 +1,9 @@
 #
-#	$Id$
-#   vi: set filetype=make:
 #
 
 BC_VERSION	= 1.06
 BC_TARBALL 	= bc-$(BC_VERSION).tar.gz
-BC_URL 		= http://os.a9group.net/pub/bc/$(BC_TARBALL)
+BC_URL 		= http://os.a9group.net/pub/$(BC_TARBALL)
 BC_DIR 		= $(INITRD_SRC_DIR)/bc-$(BC_VERSION)
 BC_PATCHES 	= $(shell ls $(INITRD_PATCH_DIR)/bc.*.patch 2>/dev/null | sort)
 

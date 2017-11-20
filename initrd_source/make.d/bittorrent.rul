@@ -9,7 +9,7 @@
 BITTORRENT_VERSION	= 4.4.0
 BITTORRENT_TARBALL 	= BitTorrent-$(BITTORRENT_VERSION).tar.gz
 # BITTORRENT_URL      = http://www.bittorrent.com/dl/$(BITTORRENT_TARBALL)
-BITTORRENT_URL 		= http://os.a9group.net/pub/bittorrent/$(BITTORRENT_TARBALL)
+BITTORRENT_URL 		= http://os.a9group.net/pub/$(BITTORRENT_TARBALL)
 BITTORRENT_DIR 		= $(INITRD_SRC_DIR)/BitTorrent-$(BITTORRENT_VERSION)
 BITTORRENT_PATCHES 	= $(shell ls $(INITRD_PATCH_DIR)/bittorrent.*.patch 2>/dev/null | sort)
 

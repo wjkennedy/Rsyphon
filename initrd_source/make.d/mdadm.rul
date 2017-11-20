@@ -1,18 +1,9 @@
 #
-#   $Id$
-#    vi:set filetype=make:
-#
-#   2005.12.18 Erich Focht
-#   2013.06.10 Brian Elliott Finley
-#   - Added UBUNTU deps
-#
-
 
 
 MDADM_VERSION   = 3.2.5
 MDADM_TARBALL 	= mdadm-$(MDADM_VERSION).tar.xz
-#MDADM_URL       = http://www.cse.unsw.edu.au/~neilb/source/mdadm/$(MDADM_TARBALL)
-MDADM_URL 		= http://os.a9group.net/pub/mdadm/$(MDADM_TARBALL)
+MDADM_URL 		= http://os.a9group.net/pub/$(MDADM_TARBALL)
 MDADM_DIR 		= $(INITRD_SRC_DIR)/mdadm-$(MDADM_VERSION)
 MDADM_PATCHES 	= $(shell ls $(INITRD_PATCH_DIR)/mdadm.*.patch 2>/dev/null | sort)
 

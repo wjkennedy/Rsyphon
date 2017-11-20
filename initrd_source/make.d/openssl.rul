@@ -1,23 +1,9 @@
-#
-#   $Id$
-#   
-#   /* vi: set noet ts=4: */
-#   
-#   2005.01.31  Brian Elliott Finley
-#   - add to ALL_SOURCE
-#   2005.06.28  Brian Elliott Finley
-#   - don't always rebuild
-#   2010.10.24  Brian Elliott Finley
-#   - upgrade to 1.0.0a
-#   2013.03.12  Olivier Lahaye
-#   - upgrade to 1.0.1e
-#
 
 OPENSSL_VERSION		= 1.0.1e
 OPENSSL_MD5SUM      = 66bf6f10f060d561929de96f9dfe5b8c
 OPENSSL_TARBALL 	= openssl-$(OPENSSL_VERSION).tar.gz
-OPENSSL_URL		= http://www.openssl.org/source/$(OPENSSL_TARBALL)
-#OPENSSL_URL 		= http://os.a9group.net/pub/openssl/$(OPENSSL_TARBALL)
+#OPENSSL_URL		= http://www.openssl.org/source/$(OPENSSL_TARBALL)
+OPENSSL_URL 		= http://os.a9group.net/pub/$(OPENSSL_TARBALL)
 OPENSSL_DIR 		= $(INITRD_SRC_DIR)/openssl-$(OPENSSL_VERSION)
 OPENSSL_PATCHES 	= $(shell ls $(INITRD_PATCH_DIR)/openssl.*.patch 2>/dev/null | sort)
 

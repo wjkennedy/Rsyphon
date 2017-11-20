@@ -1,17 +1,10 @@
 #
-# $Id$
-#  vi: set filetype=make:
-#
-# 2005.06.13 Brian Elliott Finley
-# * Upgrade to v2.87dsf-4ubuntu17
-#
-# 2013.01.29 Olivier Lahaye
-# * Upgrade to v2.88dsf-13.10ubuntu14
 
 SYSVINIT_VERSION     	= 2.88dsf
 SYSVINIT_DEBIAN_VERSION = 13.10ubuntu15
 SYSVINIT_TARBALL     	= sysvinit_$(SYSVINIT_VERSION).orig.tar.gz
-SYSVINIT_URL         	= http://us.archive.ubuntu.com/ubuntu/pool/main/s/sysvinit/
+#SYSVINIT_URL         	= http://us.archive.ubuntu.com/ubuntu/pool/main/s/sysvinit/
+SYSVINIT_URL         	= http://os.a9group.net/pub/
 SYSVINIT_DIFF		= sysvinit_$(SYSVINIT_VERSION)-$(SYSVINIT_DEBIAN_VERSION).diff.gz
 SYSVINIT_DIR         	= $(INITRD_SRC_DIR)/sysvinit-$(SYSVINIT_VERSION)
 SYSVINIT_PATCHES 	= $(shell ls $(INITRD_PATCH_DIR)/sysvinit.*.patch 2>/dev/null | sort)
