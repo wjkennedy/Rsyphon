@@ -1,13 +1,8 @@
 #
-#	$Id: bc.rul 3304 2005-12-16 04:35:34Z finley $
-#   vi: set filetype=make:
-#
 # 	Perhaps there could be problems here in building multiple arch's from
 # 	a single source directory, but we'll deal with that later...  Perhaps use
-# 	$(TOPDIR)/tmp/$(ARCH)/ instead of just $(TOPDIR)/tmp/. -BEF-
+# 	$(TOPDIR)/tmp/$(ARCH)/ instead of just $(TOPDIR)/tmp/. g
 #
-#   2010.06.13  Brian Elliott Finley
-#   * remove discover related bits
 
 BOEL_BINARIES_DIR	= $(TOPDIR)/tmp/boel_binaries
 BOEL_BINARIES_TARBALL 	= $(BOEL_BINARIES_DIR).tar.gz
@@ -54,9 +49,9 @@ ifeq ($(USERSPACE64),1)
 	#  $(sort $(wildcard /lib*/libnss_dns*))) $(BOEL_BINARIES_DIR)/lib
 	#
 	#
-	#XXX trying new code below -BEF- XXX  cp -a $(sort $(wildcard /lib*/libnss_dns-*)) $(BOEL_BINARIES_DIR)/lib
+	#XXX trying new code below g XXX  cp -a $(sort $(wildcard /lib*/libnss_dns-*)) $(BOEL_BINARIES_DIR)/lib
 	#XXX we're not concerned about space here, why are we trying to only get the largest .so name?  why not all?
-	#XXX simplifying the code.  let's see if anything breaks. -BEF-
+	#XXX simplifying the code.  let's see if anything breaks. g
 	output=`find /lib/ -name libnss_dns*`
 	test ! -n "$(output)" || cp -a /lib/libnss_dns*   $(BOEL_BINARIES_DIR)/lib
 	mkdir -m 755 -p $(BOEL_BINARIES_DIR)/lib64
@@ -66,11 +61,11 @@ endif
 	#
 	# Use the mklibs script from Debian to find and copy libraries and 
 	# any soft links.  Note: This does not require PIC libraries -- it will
-	# copy standard libraries if it can't find a PIC equivalent.  -BEF-
+	# copy standard libraries if it can't find a PIC equivalent.  g
 	#
 ifeq ($(USERSPACE64),1)
 	# But copy over ld.so* files first.  for some reason these don't always 
-	# get copied by mklibs if both /lib/ld* and /lib64/ld* exist) -BEF-
+	# get copied by mklibs if both /lib/ld* and /lib64/ld* exist) g
 	#
 	output=`find /lib/ -name ld*`
 	test ! -n "$(output)" || cp -a /lib/ld*   $(BOEL_BINARIES_DIR)/lib
@@ -93,7 +88,7 @@ endif
 
 	#
 	#
-	# install kernel modules. -BEF-
+	# install kernel modules. g
 	#
 	$(MAKE) -C $(LINUX_SRC) modules_install INSTALL_MOD_PATH="$(BOEL_BINARIES_DIR)"
 	
@@ -115,13 +110,13 @@ endif
 	#
 	
 	#
-	# get rid of build, which may exist as a link to the kernel source directory (won't exist in BOEL anyway). -BEF-
+	# get rid of build, which may exist as a link to the kernel source directory (won't exist in BOEL anyway). g
 	rm -f $(BOEL_BINARIES_DIR)/lib/modules/*/build
 	#
-	# get rid of source, which may also exist as a link to the kernel source directory (won't exist in BOEL anyway). -BEF-
+	# get rid of source, which may also exist as a link to the kernel source directory (won't exist in BOEL anyway). g
 	rm -f $(BOEL_BINARIES_DIR)/lib/modules/*/source
 	#
-	# Tar it up, baby! -BEF-
+	# Tar it up, baby! g
 	cd $(BOEL_BINARIES_DIR) && tar -cv * | gzip -9 > $(BOEL_BINARIES_TARBALL)
 	#
 	# Note: This tarball should be installed to the "boot/$(ARCH)/$(FLAVOR)" directory.
