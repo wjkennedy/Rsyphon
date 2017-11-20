@@ -21,16 +21,16 @@ On your golden client, apt-get install rsyphon-client.
 
 On your image server, apt-get install rsyphon-server
 
-On your golden client, run the command "rsprepareclient". rsprepareclient will ask you some questions, then leave your golden client ready to have it's image pulled.
+On your golden client, run the command "rs_prepareclient". rs_prepareclient will ask you some questions, then leave your golden client ready to have it's image pulled.
 
 On the image server, run the command:
 
-    rsgetimage -golden-client <golden_client> -image <image_name>
+    rs_getimage -golden-client <golden_client> -image <image_name>
 
  where <golden_client> is the ip or hostname of your golden client, and <image_name> is the name you would like to use to refer to this image, e.g. web_server, woody_2001_10_05, debian2.2r4_lp1000r, etc.  You should see filenames fly by on the screen as getimage rsyncs over the contents of your golden client.
 
 ### Assign clients to an image 
-On the image server, run the 'rsaddclients' command to assign clients to your image.
+On the image server, run the 'rs_addclients' command to assign clients to your image.
 
 ### Create autoinstall media
 
